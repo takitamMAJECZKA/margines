@@ -4,7 +4,6 @@ import { LANGUAGES, type LanguageCode } from "@/lib/languages";
 import { ProviderRequestError } from "@/lib/server/errors";
 import { serverCache } from "@/lib/server/cache";
 import { fetchWithTimeout, readJson } from "@/lib/server/http";
-import { escapeRegExp } from "@/lib/utils";
 import type { ApiIssue, AuthenticExample } from "@/types/api";
 
 const TATOEBA_API = "https://api.tatoeba.org/v1/sentences";
@@ -51,23 +50,11 @@ export interface TatoebaSearchResult {
   error: ApiIssue | null;
 }
 
-function containsExactWord(sentence: string, word: string): boolean {
-  const normalizedSentence = sentence.normalize("NFC").replace(/\s+/g, " ");
-  const escapedWord = escapeRegExp(word.normalize("NFC").trim()).replace(/ +/g, "\\s+");
-  const pattern = new RegExp(
-    `(^|[^\\p{L}\\p{M}])${escapedWord}($|[^\\p{L}\\p{M}])`,
-    "iu",
-  );
-
-  return pattern.test(normalizedSentence);
-}
-
-function isUsefulSentence(sentence: string, word: string): boolean {
+function isUsefulSentence(sentence: string): boolean {
   const clean = sentence.trim();
   if (clean.length < 8 || clean.length > 180) return false;
-  if (clean.toLocaleLowerCase("pl") === word.toLocaleLowerCase("pl")) return false;
   if (clean.split(/\s+/).length < 2) return false;
-  return containsExactWord(clean, word);
+  return true;
 }
 
 function pickTranslation(sentence: TatoebaSentence): {
@@ -184,12 +171,16 @@ function rankExamples(examples: AuthenticExample[]): AuthenticExample[] {
 
 function collectExamples(
   sentences: TatoebaSentence[],
-  word: string,
   seen: Set<string>,
   target: AuthenticExample[],
 ): void {
   for (const sentence of sentences) {
-    if (!isUsefulSentence(sentence.text ?? "", word)) continue;
+    // Tatoeba stems searches for English, Spanish, French and German. Its `q`
+    // results can therefore contain valid inflections (e.g. perros for perro,
+    // or went for go). Requiring the literal headword here discarded those
+    // results, so trust the language-filtered search and only apply quality
+    // checks to the returned sentence.
+    if (!isUsefulSentence(sentence.text ?? "")) continue;
     const mapped = mapSentence(sentence);
     if (!mapped) continue;
 
@@ -249,11 +240,11 @@ export async function findAuthenticExamples(
     const examples: AuthenticExample[] = [];
 
     if (translated.status === "fulfilled") {
-      collectExamples(translated.value, word, seen, examples);
+      collectExamples(translated.value, seen, examples);
     }
 
     if (examples.length < MAX_EXAMPLES && fallback.status === "fulfilled") {
-      collectExamples(fallback.value, word, seen, examples);
+      collectExamples(fallback.value, seen, examples);
     }
 
     const ranked = rankExamples(examples)
