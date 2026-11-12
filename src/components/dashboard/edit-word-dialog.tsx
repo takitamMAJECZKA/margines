@@ -62,7 +62,9 @@ export function EditWordDialog({
         ? /^(?:der|die|das|den|dem|des)\s+/i
         : sourceLanguage === "es"
           ? /^(?:el|la|los|las|un|una|unos|unas)\s+/i
-          : /^(?:a|an|the)\s+/i,
+          : sourceLanguage === "fr"
+            ? /^(?:le|la|les|l['’]|un|une|des)\s*/i
+            : /^(?:a|an|the)\s+/i,
       "",
     );
     if (!searchWord) return;

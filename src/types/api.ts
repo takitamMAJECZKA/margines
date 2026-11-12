@@ -51,6 +51,8 @@ export interface EnrichResponse {
   baseWord?: string;
   /** True when Wiktionary supplied a gender/article for this noun. */
   articleApplied?: boolean;
+  /** True when the user entered Polish and the learned-language word was translated. */
+  reverseLookup?: boolean;
   translation: TranslationResult;
   /** Available for the native Polish dictionary. */
   definitions?: DefinitionEntry[];

@@ -20,7 +20,7 @@ import { getCachedLookup, lookupKey, saveLookup } from "@/db/lookups";
 import type { Dictionary } from "@/db/types";
 import { attachExampleIfEmpty, findWordByText } from "@/db/words";
 import { ApiClientError, fetchArticle, fetchDefinition, fetchEnrichment, fetchExamples } from "@/lib/api-client";
-import type { ForeignLanguageCode } from "@/lib/languages";
+import { LANGUAGES, type ForeignLanguageCode, type LanguageCode } from "@/lib/languages";
 import { normalizeWord } from "@/lib/utils";
 import { wordTextSchema } from "@/lib/validation";
 import type { EnrichResponse } from "@/types/api";
@@ -74,6 +74,10 @@ export function AddWordDialog({
 }: AddWordDialogProps) {
   const [phase, setPhase] = useState<"input" | "preview">("input");
   const [word, setWord] = useState(initialWord);
+  const [inputLanguage, setInputLanguage] = useState<LanguageCode>(
+    dictionary.isNative ? "pl" : dictionary.sourceLanguage,
+  );
+  const [directionDialogOpen, setDirectionDialogOpen] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
   const [enrichment, setEnrichment] = useState<EnrichResponse | null>(null);
   const [examplesLoading, setExamplesLoading] = useState(false);
@@ -173,9 +177,10 @@ export function AddWordDialog({
         throw new ApiClientError("Ten słownik nie obsługuje automatycznego wyszukiwania.");
       }
 
+      const targetLanguage = inputLanguage === "pl" ? sourceLanguage : "pl";
       const key = lookupKey(
-        dictionary.sourceLanguage,
-        dictionary.targetLanguage,
+        inputLanguage,
+        targetLanguage,
         normalizeWord(text),
       );
 
@@ -184,11 +189,34 @@ export function AddWordDialog({
         if (cached) return { response: cached, key };
       }
 
+      if (inputLanguage === "pl") {
+        const translated = await fetchEnrichment(text, "pl", sourceLanguage);
+        if (!translated.translation.text) {
+          throw new ApiClientError(
+            translated.translation.error?.message ?? "Nie udało się przetłumaczyć słowa.",
+            translated.translation.error?.code,
+          );
+        }
+
+        const baseWord = translated.translation.text.trim();
+        const article = await fetchArticle(baseWord, sourceLanguage).catch(() => null);
+        const response: EnrichResponse = {
+          ...translated,
+          word: article?.applied ? article.word : baseWord,
+          baseWord,
+          articleApplied: Boolean(article?.applied),
+          reverseLookup: true,
+          translation: { text, provider: null, error: null },
+          examples: [],
+        };
+        return { response, key };
+      }
+
       const [translated, article] = await Promise.all([
         fetchEnrichment(text, sourceLanguage),
         fetchArticle(text, sourceLanguage).catch(() => null),
       ]);
-      const response = article?.applied
+      const response: EnrichResponse = article?.applied
         ? { ...translated, word: article.word, baseWord: text, articleApplied: true }
         : translated;
       return { response, key };
@@ -245,23 +273,42 @@ export function AddWordDialog({
 
     try {
       const { response, key } = await lookupMutation.mutateAsync({ text, force });
+
+      if (inputLanguage === "pl") {
+        const duplicate =
+          (await findWordByText(dictionary.id, response.word)) ??
+          (response.baseWord
+            ? await findWordByText(dictionary.id, response.baseWord)
+            : undefined);
+        if (duplicate) {
+          setInputError(`Słowo „${duplicate.originalWord}” już istnieje w tym słowniku.`);
+          return;
+        }
+      }
+
       setCurrentEnrichment(response);
       setPhase("preview");
 
       if (response.examples.length === 0) {
-        void loadExamples(text, key);
+        void loadExamples(response.baseWord ?? response.word, key);
       }
     } catch (error) {
       const message =
         error instanceof ApiClientError
           ? error.message
           : "Nie udało się pobrać danych. Wpisz tłumaczenie ręcznie.";
+
+      if (inputLanguage === "pl") {
+        setInputError(message);
+        return;
+      }
+
       setCurrentEnrichment(failedEnrichment(text, message));
       setPhase("preview");
 
       const key = lookupKey(
-        dictionary.sourceLanguage,
-        dictionary.targetLanguage,
+        inputLanguage,
+        "pl",
         normalizeWord(text),
       );
       void loadExamples(text, key);
@@ -273,11 +320,11 @@ export function AddWordDialog({
     if (!current || !sourceLanguage) return;
 
     const key = lookupKey(
-      dictionary.sourceLanguage,
-      dictionary.targetLanguage,
-      normalizeWord(current.word),
+      inputLanguage,
+      inputLanguage === "pl" ? sourceLanguage ?? "pl" : "pl",
+      normalizeWord(word),
     );
-    void loadExamples(current.word, key);
+    void loadExamples(current.baseWord ?? current.word, key);
   }
 
   useEffect(() => {
@@ -313,7 +360,25 @@ export function AddWordDialog({
     onOpenChange(nextOpen);
   }
 
+  function chooseInputLanguage(nextLanguage: LanguageCode) {
+    setDirectionDialogOpen(false);
+    setInputError(null);
+    if (nextLanguage === inputLanguage) return;
+
+    setInputLanguage(nextLanguage);
+    if (phase === "preview") {
+      const suggestedInput =
+        nextLanguage === "pl"
+          ? enrichment?.translation.text
+          : enrichment?.word;
+      if (suggestedInput) setWord(suggestedInput);
+      setCurrentEnrichment(null);
+      setPhase("input");
+    }
+  }
+
   return (
+    <>
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         {phase === "input" || !enrichment ? (
@@ -322,14 +387,43 @@ export function AddWordDialog({
               <DialogTitle>Dodaj słowo</DialogTitle>
               <DialogDescription>
                 {sourceLanguage
-                  ? "Wpisz słowo z książki. Pobierzemy tłumaczenie i przykładowe zdanie, a Ty zdecydujesz, co zapisać."
+                  ? inputLanguage === "pl"
+                    ? `Wpisz słowo po polsku. Przetłumaczymy je na ${LANGUAGES[sourceLanguage].name} i dodamy do tego słownika.`
+                    : `Wpisz słowo po ${LANGUAGES[sourceLanguage].adjective}. Domyślnie tłumaczymy je na polski.`
                   : "Wpisz słowo i tłumaczenie. W słowniku ojczystym wszystko dodajesz ręcznie."}
               </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleInputSubmit} className="grid gap-5">
+              {sourceLanguage ? (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-muted/30 px-3.5 py-3">
+                  <div>
+                    <p className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+                      Język wpisywania
+                    </p>
+                    <p className="mt-0.5 text-sm font-medium">
+                      {LANGUAGES[inputLanguage].name}
+                      {inputLanguage === sourceLanguage ? " · domyślnie" : ""}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDirectionDialogOpen(true)}
+                    disabled={lookupPending}
+                  >
+                    Zmień język
+                  </Button>
+                </div>
+              ) : null}
+
               <div className="grid gap-2">
-                <Label htmlFor="new-word">Słowo</Label>
+                <Label htmlFor="new-word">
+                  {sourceLanguage
+                    ? `Słowo po ${LANGUAGES[inputLanguage].adjective}`
+                    : "Słowo"}
+                </Label>
                 <Input
                   id="new-word"
                   value={word}
@@ -338,11 +432,17 @@ export function AddWordDialog({
                     setInputError(null);
                   }}
                   placeholder={
-                    sourceLanguage === "es"
-                      ? "np. asombroso"
-                      : sourceLanguage === "en"
-                        ? "np. wholesome"
-                        : "np. słowo"
+                    inputLanguage === "pl"
+                      ? "np. pies"
+                      : sourceLanguage === "es"
+                        ? "np. asombroso"
+                        : sourceLanguage === "en"
+                          ? "np. wholesome"
+                          : sourceLanguage === "de"
+                            ? "np. Hund"
+                            : sourceLanguage === "fr"
+                              ? "np. chien"
+                              : "np. słowo"
                   }
                   autoFocus
                   autoComplete="off"
@@ -356,7 +456,9 @@ export function AddWordDialog({
                 />
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   {sourceLanguage
-                    ? "Sprawdzimy tłumaczenie oraz przykładowe zdanie. Przed zapisem możesz poprawić tłumaczenie."
+                    ? inputLanguage === "pl"
+                      ? "Wynik zapisze się na fiszce tak samo jak przy wpisaniu słowa w języku obcym."
+                      : "Sprawdzimy tłumaczenie oraz przykładowe zdanie. Przed zapisem możesz poprawić polskie znaczenie."
                     : "Możesz dodać słowo z tłumaczeniem."}
                 </p>
               </div>
@@ -413,6 +515,7 @@ export function AddWordDialog({
               setCurrentEnrichment(null);
             }}
             onClose={handleClose}
+            onChangeInputLanguage={() => setDirectionDialogOpen(true)}
             onSaved={(savedWord) => {
               savedWordIdRef.current = savedWord.id;
               const firstExample = enrichmentRef.current?.examples[0];
@@ -425,5 +528,41 @@ export function AddWordDialog({
         )}
       </DialogContent>
     </Dialog>
+    <Dialog open={directionDialogOpen} onOpenChange={setDirectionDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Zmień język wpisywania</DialogTitle>
+          <DialogDescription>
+            Domyślnie wpisujesz słowo w języku słownika. Możesz przełączyć się na polski.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2">
+          {sourceLanguage ? (
+            <Button
+              type="button"
+              variant={inputLanguage === sourceLanguage ? "default" : "outline"}
+              className="h-auto justify-start py-3"
+              onClick={() => chooseInputLanguage(sourceLanguage)}
+            >
+              Wpisuję po {LANGUAGES[sourceLanguage].adjective} · domyślnie
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant={inputLanguage === "pl" ? "default" : "outline"}
+            className="h-auto justify-start py-3"
+            onClick={() => chooseInputLanguage("pl")}
+          >
+            Wpisuję po polsku
+          </Button>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setDirectionDialogOpen(false)}>
+            Wróć
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

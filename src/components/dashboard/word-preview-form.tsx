@@ -103,6 +103,7 @@ interface WordPreviewFormProps {
   onBack: () => void;
   onClose: () => void;
   onSaved: (word: Word) => void;
+  onChangeInputLanguage: () => void;
 }
 
 export function WordPreviewForm({
@@ -116,6 +117,7 @@ export function WordPreviewForm({
   onBack,
   onClose,
   onSaved,
+  onChangeInputLanguage,
 }: WordPreviewFormProps) {
   const examples = enrichment.examples.slice(0, 1);
   const firstExample = examples[0];
@@ -222,6 +224,17 @@ export function WordPreviewForm({
           <ArrowLeft />
           Zmień słowo
         </Button>
+        {!dictionary.isNative ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onChangeInputLanguage}
+            className="-ml-2 w-fit text-muted-foreground"
+          >
+            Zmień język wpisywania
+          </Button>
+        ) : null}
         <DialogTitle>Sprawdź i zapisz</DialogTitle>
         <DialogDescription>
           Popraw tłumaczenie, wybierz jedno z przykładowych zdań albo zapisz
@@ -267,7 +280,9 @@ export function WordPreviewForm({
               {translation && !translationError ? (
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <Sparkles className="size-3 text-emerald-600 dark:text-emerald-400" />
-              {dictionary.isNative
+                  {enrichment.reverseLookup
+                    ? "Polskie znaczenie wpisane przez Ciebie"
+                    : dictionary.isNative
                 ? enrichment.translation.provider === "wiktionary" ? "Definicje z polskiego Wikisłownika" : "Definicja wpisana ręcznie"
                 : `Tłumaczenie automatyczne · ${providerLabel(enrichment.translation.provider)}`}
             </p>

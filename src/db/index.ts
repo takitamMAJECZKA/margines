@@ -88,6 +88,29 @@ class MarginesDatabase extends Dexie {
           })),
         );
       });
+
+    // v5 — knowledge score and last flashcard appearance for daily reviews.
+    this.version(5)
+      .stores({
+        dictionaries: "id, name, sourceLanguage, createdAt, sortOrder",
+        words:
+          "id, dictionaryId, [dictionaryId+normalizedWord], [dictionaryId+createdAt], createdAt",
+        meta: "key",
+        lookups: "key, createdAt",
+        sets: "id, dictionaryId, [dictionaryId+createdAt], createdAt",
+        setWords: "id, setId, wordId, dictionaryId, [setId+createdAt]",
+      })
+      .upgrade(async (transaction) => {
+        await transaction
+          .table<Word>("words")
+          .toCollection()
+          .modify((word) => {
+            word.knowledgeScore ??= word.lastReviewKnown
+              ? Math.min(5, 1 + Math.floor((word.reviewCount ?? 0) / 2))
+              : 0;
+            word.lastAppearedAt ??= word.lastReviewedAt ?? null;
+          });
+      });
   }
 }
 

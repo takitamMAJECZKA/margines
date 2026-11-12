@@ -32,6 +32,10 @@ export interface Word {
   lastReviewedAt: number | null;
   /** Whether the latest flashcard answer was "known". Feeds a future SRS scheduler. */
   lastReviewKnown: boolean | null;
+  /** User's familiarity rating, clamped to the 0–5 daily review scale. */
+  knowledgeScore: number;
+  /** Last time this word was shown on a flashcard. */
+  lastAppearedAt: number | null;
   createdAt: number;
   updatedAt: number;
 }

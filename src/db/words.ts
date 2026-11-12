@@ -104,6 +104,8 @@ export async function createWord(
     reviewCount: 0,
     lastReviewedAt: null,
     lastReviewKnown: null,
+    knowledgeScore: 0,
+    lastAppearedAt: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -225,7 +227,11 @@ export async function restoreWord(
   }
 }
 
-export async function recordReview(id: string, known: boolean): Promise<void> {
+export async function recordReview(
+  id: string,
+  known: boolean,
+  updateKnowledgeScore = false,
+): Promise<void> {
   const word = await db.words.get(id);
   if (!word) return;
 
@@ -233,7 +239,19 @@ export async function recordReview(id: string, known: boolean): Promise<void> {
     reviewCount: (word.reviewCount ?? 0) + 1,
     lastReviewedAt: Date.now(),
     lastReviewKnown: known,
-    // A future SRS implementation can persist scheduling data here.
+    ...(updateKnowledgeScore
+      ? {
+          knowledgeScore: Math.max(
+            0,
+            Math.min(5, (word.knowledgeScore ?? 0) + (known ? 1 : -1)),
+          ),
+        }
+      : {}),
     updatedAt: Date.now(),
   });
+}
+
+export async function markWordAppeared(id: string): Promise<void> {
+  const now = Date.now();
+  await db.words.update(id, { lastAppearedAt: now, updatedAt: now });
 }

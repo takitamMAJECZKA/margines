@@ -1,4 +1,4 @@
-import type { ForeignLanguageCode } from "@/lib/languages";
+import type { ForeignLanguageCode, LanguageCode } from "@/lib/languages";
 import type {
   AiExampleResponse,
   ArticleResponse,
@@ -77,12 +77,13 @@ async function postJson<T>(
 
 export async function fetchEnrichment(
   word: string,
-  sourceLanguage: ForeignLanguageCode,
+  sourceLanguage: LanguageCode,
+  targetLanguage: LanguageCode = "pl",
   signal?: AbortSignal,
 ): Promise<EnrichResponse> {
   return postJson<EnrichResponse>(
     "/api/enrich",
-    { word, sourceLanguage, targetLanguage: "pl" },
+    { word, sourceLanguage, targetLanguage },
     signal,
   );
 }

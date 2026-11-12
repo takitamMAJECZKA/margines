@@ -39,8 +39,7 @@ export function NoDictionaries({ onCreate }: { onCreate: () => void }) {
         Zacznij od słownika
       </h1>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-        Utwórz słownik hiszpański, angielski lub polski. Słowa zostaną zapisane
-        tylko na tym urządzeniu.
+        Wybierz język słownika. Słowa zostaną zapisane tylko na tym urządzeniu.
       </p>
       <Button onClick={onCreate} className="mt-7">
         <Plus />

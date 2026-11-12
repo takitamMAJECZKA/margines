@@ -1,9 +1,9 @@
-export const LANGUAGE_CODES = ["es", "en", "de", "pl"] as const;
+export const LANGUAGE_CODES = ["es", "en", "de", "fr", "pl"] as const;
 
 export type LanguageCode = (typeof LANGUAGE_CODES)[number];
 
 /** Languages that are translated into Polish and can use Tatoeba examples. */
-export const FOREIGN_LANGUAGE_CODES = ["es", "en", "de"] as const;
+export const FOREIGN_LANGUAGE_CODES = ["es", "en", "de", "fr"] as const;
 
 export type ForeignLanguageCode = (typeof FOREIGN_LANGUAGE_CODES)[number];
 
@@ -36,6 +36,13 @@ export const LANGUAGES: Record<LanguageCode, LanguageInfo> = {
     short: "DE",
     deepl: "DE",
     tatoeba: "deu",
+  },
+  fr: {
+    name: "francuski",
+    adjective: "francusku",
+    short: "FR",
+    deepl: "FR",
+    tatoeba: "fra",
   },
   pl: {
     name: "polski",
@@ -89,6 +96,7 @@ export const DEFAULT_DICTIONARY_META: Record<
   es: { name: "Hiszpański", color: "amber" },
   en: { name: "Angielski", color: "sky" },
   de: { name: "Niemiecki", color: "violet" },
+  fr: { name: "Francuski", color: "stone" },
 };
 
 export function languagePairLabel(

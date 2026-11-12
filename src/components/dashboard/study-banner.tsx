@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Layers } from "lucide-react";
+import { ArrowRight, Layers, RotateCcw } from "lucide-react";
 
 import type { WordSet } from "@/db/types";
 import type { Dictionary } from "@/db/types";
@@ -16,28 +16,47 @@ export function StudyBanner({
 }) {
   if (count === 0) return null;
 
+  const scope = {
+    dictionary: dictionary.id,
+    ...(wordSet ? { set: wordSet.id } : {}),
+  };
+
   return (
-    <Link
-      href={{ pathname: "/study", query: { dictionary: dictionary.id, ...(wordSet ? { set: wordSet.id } : {}) } }}
-      prefetch
-      className="group mt-3 flex items-center gap-3.5 rounded-2xl border border-primary/15 bg-primary/[0.055] p-3.5 outline-none transition-colors hover:bg-primary/[0.085] focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-    >
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        <Layers className="size-5" aria-hidden="true" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-foreground">
-          {wordSet ? `Nauka: ${wordSet.name}` : "Tryb nauki"}
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <Link
+        href={{ pathname: "/study", query: { ...scope, mode: "daily" } }}
+        prefetch
+        className="group flex items-center gap-3 rounded-2xl border border-primary/35 bg-primary/[0.1] p-3.5 outline-none transition-colors hover:bg-primary/[0.14] focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+          <RotateCcw className="size-5" aria-hidden="true" />
         </span>
-        <span className="mt-0.5 block text-xs text-muted-foreground">
-          {count} {pluralizePolish(count, "fiszka", "fiszki", "fiszek")} · powtarzaj
-          trudne słowa aż je zapamiętasz
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-foreground">Codzienna powtórka</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            Według wyniku znajomości i terminu
+          </span>
         </span>
-      </span>
-      <ArrowRight
-        aria-hidden="true"
-        className="mr-1 size-4 shrink-0 text-primary transition-transform group-hover:translate-x-0.5"
-      />
-    </Link>
+        <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-primary transition-transform group-hover:translate-x-0.5" />
+      </Link>
+      <Link
+        href={{ pathname: "/study", query: scope }}
+        prefetch
+        className="group flex items-center gap-3 rounded-2xl border border-border bg-card/70 p-3.5 outline-none transition-colors hover:bg-card focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground">
+          <Layers className="size-5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-foreground">
+            {wordSet ? `Fiszki: ${wordSet.name}` : "Powtórz cały dział"}
+          </span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            {count} {pluralizePolish(count, "fiszka", "fiszki", "fiszek")}
+          </span>
+        </span>
+        <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+      </Link>
+    </div>
   );
 }

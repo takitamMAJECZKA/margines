@@ -53,6 +53,13 @@ const OPTIONS: Array<{
     description:
       "Tłumaczenie na polski, przykładowe zdanie i rodzajnik der/die/das dla rzeczowników.",
   },
+  {
+    code: "fr",
+    name: "Francuski",
+    label: "Francuski → polski",
+    description:
+      "Tłumaczenie na polski, przykładowe zdanie i rodzajnik dla rzeczowników.",
+  },
 ];
 
 interface DictionaryOnboardingProps {

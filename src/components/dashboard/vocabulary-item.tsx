@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { CalendarDays, Pencil, Trash2 } from "lucide-react";
+import { CalendarDays, Clock3, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { Word } from "@/db/types";
@@ -187,7 +187,7 @@ export function VocabularyItem({
             </blockquote>
           ) : null}
 
-          <div className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground/85">
+          <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground/85">
             <CalendarDays className="size-3" aria-hidden="true" />
             Dodano {formatAddedDate(word.createdAt)}
             {word.reviewCount > 0 ? (
@@ -203,6 +203,20 @@ export function VocabularyItem({
                 </span>
               </>
             ) : null}
+            <span aria-hidden="true">·</span>
+            <span>Znajomość {word.knowledgeScore}/5</span>
+            <span aria-hidden="true">·</span>
+            <Clock3 className="size-3" aria-hidden="true" />
+            <span>
+              {word.lastAppearedAt
+                ? `Ostatnio ${new Intl.DateTimeFormat("pl-PL", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }).format(word.lastAppearedAt)}`
+                : "Jeszcze nie pokazano"}
+            </span>
           </div>
         </div>
 

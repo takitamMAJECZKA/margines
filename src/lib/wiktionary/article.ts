@@ -8,6 +8,7 @@ const LANGUAGE_SECTIONS: Record<ForeignLanguageCode, string> = {
   es: "Spanish",
   en: "English",
   de: "German",
+  fr: "French",
 };
 
 const GERMAN_ARTICLES: Record<string, string> = {
@@ -83,6 +84,21 @@ function germanArticle(section: string): string | null {
   return GERMAN_ARTICLES[gender.charAt(0).toLowerCase()] ?? null;
 }
 
+function frenchArticle(section: string): string | null {
+  const raw =
+    firstTemplateParameter(section, "fr-noun") ??
+    firstTemplateParameter(section, "fr-nom") ??
+    genderFromHeadTemplate(section, "fr");
+  if (!raw) return null;
+
+  const gender = raw.toLocaleLowerCase("fr");
+  if (gender === "?" || gender === "mf" || gender.includes("/")) return null;
+  if (/(?:^|[- ])p(?:$|[- ])/.test(gender)) return "des";
+  if (gender.startsWith("m")) return "un";
+  if (gender.startsWith("f")) return "une";
+  return null;
+}
+
 function spanishArticle(section: string, headword: string): string | null {
   const raw =
     firstTemplateParameter(section, "es-noun") ??
@@ -146,6 +162,10 @@ function hasArticle(word: string, language: ForeignLanguageCode): boolean {
     return /^(el|la|los|las|un|una|unos|unas)\s+/i.test(word);
   }
 
+  if (language === "fr") {
+    return /^(le|la|les|l['’]|un|une|des)\s*/i.test(word);
+  }
+
   return /^(a|an|the)\s+/i.test(word);
 }
 
@@ -194,6 +214,8 @@ export async function findArticle(
     article = germanArticle(section);
   } else if (language === "es") {
     article = spanishArticle(section, headword);
+  } else if (language === "fr") {
+    article = frenchArticle(section);
   } else if (isEnglishNoun(section)) {
     article = englishArticle(headword);
   }

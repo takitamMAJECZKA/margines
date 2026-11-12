@@ -116,9 +116,14 @@ export type SetFormValues = z.infer<typeof setFormSchema>;
 
 export const lookupRequestSchema = z.object({
   word: z.string().trim().min(1).max(80),
-  sourceLanguage: foreignLanguageCodeSchema,
-  targetLanguage: z.literal("pl"),
-});
+  sourceLanguage: languageCodeSchema,
+  targetLanguage: languageCodeSchema,
+}).refine(
+  ({ sourceLanguage, targetLanguage }) =>
+    sourceLanguage !== targetLanguage &&
+    (sourceLanguage === "pl" || targetLanguage === "pl"),
+  "Tłumaczenie musi łączyć polski z innym językiem.",
+);
 
 export type LookupRequest = z.infer<typeof lookupRequestSchema>;
 
@@ -132,9 +137,14 @@ export type ExamplesRequest = z.infer<typeof examplesRequestSchema>;
 
 export const translateRequestSchema = z.object({
   text: z.string().trim().min(1).max(500),
-  sourceLanguage: foreignLanguageCodeSchema,
-  targetLanguage: z.literal("pl"),
-});
+  sourceLanguage: languageCodeSchema,
+  targetLanguage: languageCodeSchema,
+}).refine(
+  ({ sourceLanguage, targetLanguage }) =>
+    sourceLanguage !== targetLanguage &&
+    (sourceLanguage === "pl" || targetLanguage === "pl"),
+  "Tłumaczenie musi łączyć polski z innym językiem.",
+);
 
 export const aiExampleRequestSchema = z.object({
   word: z.string().trim().min(1).max(80),

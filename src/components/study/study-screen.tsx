@@ -26,7 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { listDictionaries } from "@/db/dictionaries";
 import { listSets, listWordsForSet } from "@/db/sets";
 import type { Word, WordSet } from "@/db/types";
-import { recordReview, listWords } from "@/db/words";
+import { markWordAppeared, recordReview, listWords } from "@/db/words";
 import { useDatabaseReady } from "@/hooks/use-database-ready";
 import { useDictionarySelection } from "@/hooks/use-dictionary-selection";
 import {
@@ -47,6 +47,14 @@ function translationSizeClass(text: string): string {
   return "text-base sm:text-lg";
 }
 
+function pairedPromptSizeClass(text: string): string {
+  const length = text.length;
+  if (length < 50) return "text-[clamp(1.65rem,6.2vw,2.25rem)]";
+  if (length < 110) return "text-[clamp(1.4rem,5.2vw,1.9rem)]";
+  if (length < 200) return "text-[clamp(1.15rem,4.2vw,1.55rem)]";
+  return "text-base";
+}
+
 function clozeSentence(word: Word, language: string): string | null {
   let term = word.originalWord.trim();
   const articlePattern =
@@ -54,7 +62,9 @@ function clozeSentence(word: Word, language: string): string | null {
       ? /^(?:der|die|das|den|dem|des)\s+/i
       : language === "es"
         ? /^(?:el|la|los|las|un|una|unos|unas)\s+/i
-        : /^(?:a|an|the)\s+/i;
+        : language === "fr"
+          ? /^(?:le|la|les|l['’]|un|une|des)\s*/i
+          : /^(?:a|an|the)\s+/i;
   term = term.replace(articlePattern, "").trim();
   if (!term) return null;
 
@@ -69,6 +79,30 @@ function clozeSentence(word: Word, language: string): string | null {
   );
   const cloze = word.exampleSentence.replace(pattern, "_____");
   return cloze === word.exampleSentence ? null : cloze;
+}
+
+const DAILY_REVIEW_INTERVALS = [0, 3, 24, 24 * 3, 24 * 7, 24 * 20].map(
+  (hours) => hours * 60 * 60 * 1000,
+);
+
+function isDueForDailyReview(word: Word, now = Date.now()): boolean {
+  const score = Math.max(0, Math.min(5, word.knowledgeScore ?? 0));
+  if (!word.lastAppearedAt) return true;
+  return now - word.lastAppearedAt >= DAILY_REVIEW_INTERVALS[score];
+}
+
+function dailyReviewWords(words: Word[], now = Date.now()): Word[] {
+  const due = words.filter((word) => isDueForDailyReview(word, now));
+  if (due.length > 0 || words.length === 0) return due;
+
+  const lowestScore = Math.min(
+    ...words.map((word) => Math.max(0, Math.min(5, word.knowledgeScore ?? 0))),
+  );
+  return lowestScore === 5
+    ? []
+    : words.filter(
+        (word) => Math.max(0, Math.min(5, word.knowledgeScore ?? 0)) === lowestScore,
+      );
 }
 
 function StudyHeader() {
@@ -135,12 +169,14 @@ export function StudyScreen() {
   const searchParams = useSearchParams();
   const initialSetId = searchParams.get("set");
   const initialDictionaryId = searchParams.get("dictionary");
+  const mode = searchParams.get("mode") === "daily" ? "daily" : "standard";
 
   return (
     <StudyScreenContent
-      key={`${initialDictionaryId ?? "selected"}:${initialSetId ?? "all"}`}
+      key={`${initialDictionaryId ?? "selected"}:${initialSetId ?? "all"}:${mode}`}
       initialSetId={initialSetId}
       initialDictionaryId={initialDictionaryId}
+      mode={mode}
     />
   );
 }
@@ -148,9 +184,11 @@ export function StudyScreen() {
 function StudyScreenContent({
   initialSetId,
   initialDictionaryId,
+  mode,
 }: {
   initialSetId: string | null;
   initialDictionaryId: string | null;
+  mode: "standard" | "daily";
 }) {
   const { ready } = useDatabaseReady();
   const dictionaries = useLiveQuery(() => listDictionaries(), []);
@@ -176,12 +214,16 @@ function StudyScreenContent({
         : undefined,
     [selected?.id, sets, scopedSet?.id],
   );
+  const studyWords =
+    words && mode === "daily"
+      ? dailyReviewWords(words)
+      : words ?? [];
 
   const [session, dispatch] = useReducer(studyReducer, null);
 
   function startSession() {
-    if (!words || words.length === 0) return;
-    dispatch({ type: "start", words });
+    if (studyWords.length === 0) return;
+    dispatch({ type: "start", words: studyWords, mode });
   }
 
   function changeScope(id: string) {
@@ -194,10 +236,20 @@ function StudyScreenContent({
 
     const { id } = session.current;
     dispatch({ type: "answer", known });
-    void recordReview(id, known).catch((error) => {
+    void recordReview(id, known, mode === "daily").catch((error) => {
       console.error("Could not save review", error);
     });
   }
+
+  const currentWordId = session?.current?.id;
+  const sessionAttempts = session?.attempts;
+
+  useEffect(() => {
+    if (!currentWordId) return;
+    void markWordAppeared(currentWordId).catch((error) => {
+      console.error("Could not save flashcard appearance", error);
+    });
+  }, [currentWordId, sessionAttempts]);
 
   useEffect(() => {
     if (!session || session.finished) return;
@@ -273,9 +325,22 @@ function StudyScreenContent({
     );
   }
 
-  const total = session?.cards.length ?? words.length;
+  if (mode === "daily" && studyWords.length === 0) {
+    return (
+      <div className="flex min-h-dvh flex-col">
+        <StudyHeader />
+        <StudyEmpty
+          title="Na dziś wszystko powtórzone"
+          description="Kolejne słowa pojawią się w codziennej powtórce, gdy nadejdzie ich termin."
+        />
+      </div>
+    );
+  }
+
+  const total = session?.cards.length ?? studyWords.length;
   const knownCount = session?.knownIds.length ?? 0;
-  const progress = total === 0 ? 0 : Math.round((knownCount / total) * 100);
+  const completedCount = session?.mode === "daily" ? session.attempts : knownCount;
+  const progress = total === 0 ? 0 : Math.round((completedCount / total) * 100);
   const clozePrompt =
     session?.current && !selected.isNative && session.current.exampleSentence
       ? clozeSentence(session.current, selected.sourceLanguage)
@@ -288,14 +353,15 @@ function StudyScreenContent({
       {!session ? (
         <main className="mx-auto w-full max-w-xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
           <p className="text-[10px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
-            Tryb nauki
+            {mode === "daily" ? "Codzienna powtórka" : "Tryb nauki"}
           </p>
           <h1 className="mt-2 font-display text-4xl font-medium tracking-[-0.03em] sm:text-5xl">
             Gotowy na powtórkę?
           </h1>
           <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
-            Na przodzie widzisz polskie tłumaczenie. Odsłoń słowo w języku obcym,
-            oceń, czy je znasz, a trudne fiszki wrócą w tej sesji jeszcze raz.
+            {mode === "daily"
+              ? "Powtarzaj słowa, którym nadszedł termin. Każde pojawi się raz; ocena zmieni wynik znajomości."
+              : "Na przodzie widzisz polskie tłumaczenie. Odsłoń słowo w języku obcym, oceń, czy je znasz, a trudne fiszki wrócą w tej sesji jeszcze raz."}
           </p>
 
           <div className="mt-8 rounded-3xl border border-border bg-card p-5 shadow-card">
@@ -344,19 +410,25 @@ function StudyScreenContent({
                     selected.targetLanguage,
                     selected.isNative,
                   )}{" "}
-                  · {wordCountLabel(words.length)}
+                  · {wordCountLabel(studyWords.length)}
                   {scopedSet ? " · tylko ten zestaw" : ""}
                 </p>
               </div>
               <Badge variant="secondary" className="shrink-0">
-                {words.length}{" "}
-                {pluralizePolish(words.length, "fiszka", "fiszki", "fiszek")}
+                {studyWords.length}{" "}
+                {pluralizePolish(studyWords.length, "fiszka", "fiszki", "fiszek")}
               </Badge>
             </div>
 
             <div className="mt-5 border-t border-dashed border-border pt-4 text-xs leading-relaxed text-muted-foreground">
-              Front pokazuje polskie tłumaczenie. Przesuń fiszkę w lewo, jeśli nie
-              znasz słowa, albo w prawo, jeśli je znasz — bez odwracania karty.
+              {mode === "daily" ? (
+                <>
+                  Wynik 0: przy każdej powtórce · 1: co 3 h · 2: co 24 h · 3: co 3 dni · 4: co tydzień · 5: co 20 dni.
+                  W codziennej powtórce błędna odpowiedź odejmuje punkt, poprawna dodaje punkt.
+                </>
+              ) : (
+                "Front pokazuje polskie tłumaczenie. Przesuń fiszkę w lewo, jeśli nie znasz słowa, albo w prawo, jeśli je znasz — bez odwracania karty."
+              )}
             </div>
           </div>
 
@@ -367,7 +439,7 @@ function StudyScreenContent({
             className="mt-4 h-13 w-full text-[0.95rem]"
           >
             <Play />
-            Rozpocznij sesję
+            {mode === "daily" ? "Rozpocznij codzienną powtórkę" : "Rozpocznij sesję"}
           </Button>
 
           <div className="mt-5 flex items-center justify-center gap-3 text-xs text-muted-foreground">
@@ -396,8 +468,10 @@ function StudyScreenContent({
       ) : session.finished ? (
         <StudySummary
           session={session}
+          mode={session.mode}
           contextName={scopedSet?.name ?? selected.name}
           onRestart={startSession}
+          canRestart={mode !== "daily" || studyWords.length > 0}
           onChangeScope={() => dispatch({ type: "reset" })}
         />
       ) : (
@@ -407,7 +481,9 @@ function StudyScreenContent({
               {scopedSet?.name ?? selected.name}
             </span>
             <span className="tabular-nums text-muted-foreground">
-              {knownCount} / {total} opanowane
+              {session.mode === "daily"
+                ? `${completedCount} / ${total} powtórzone`
+                : `${knownCount} / ${total} opanowane`}
             </span>
           </div>
 
@@ -441,7 +517,9 @@ function StudyScreenContent({
                   {LANGUAGES[selected.targetLanguage].short}
                 </Badge>
                 <span className="text-[11px] text-muted-foreground">
-                  Pozostało {session.queue.length}
+                  {session.mode === "daily"
+                    ? `Wynik ${session.current.knowledgeScore ?? 0}/5 · pozostało ${session.queue.length}`
+                    : `Pozostało ${session.queue.length}`}
                 </span>
               </div>
 
@@ -455,27 +533,27 @@ function StudyScreenContent({
                     {LANGUAGES[selected.targetLanguage].name}
                   </span>
                   {clozePrompt ? (
-                    <div className="mt-5 max-h-56 w-full max-w-full overflow-y-auto overscroll-contain px-1">
+                    <div className="mt-5 max-h-64 w-full max-w-full overflow-y-auto overscroll-contain px-2 py-2">
                       <p className="mb-2 text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
                         {LANGUAGES[selected.sourceLanguage].name} · uzupełnij słowo
                       </p>
-                      <p className={`font-display leading-[1.15] font-medium tracking-[-0.025em] whitespace-pre-line break-words ${translationSizeClass(clozePrompt)}`}>
+                      <p className={`font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words ${pairedPromptSizeClass(clozePrompt)}`}>
                         „{clozePrompt}”
                       </p>
                     </div>
                   ) : (
-                    <div className="mt-5 max-h-56 w-full max-w-full overflow-y-auto overscroll-contain px-1">
-                      <p className={`font-display leading-[1.12] font-medium tracking-[-0.03em] whitespace-pre-line break-words ${translationSizeClass(session.current.translation)}`}>
+                    <div className="mt-5 max-h-64 w-full max-w-full overflow-y-auto overscroll-contain px-2 py-2">
+                      <p className={`font-display leading-[1.25] font-medium tracking-[-0.03em] whitespace-pre-line break-words ${translationSizeClass(session.current.translation)}`}>
                         {session.current.translation}
                       </p>
                     </div>
                   )}
                   {clozePrompt ? (
-                    <div className="mt-4 max-h-20 max-w-full overflow-y-auto px-2">
+                    <div className="mt-3 max-h-36 max-w-full overflow-y-auto px-2 py-2">
                       <p className="text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
                         Po polsku
                       </p>
-                      <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-foreground/80">
+                      <p className={`mt-1 font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words text-foreground/85 ${pairedPromptSizeClass(clozePrompt)}`}>
                         {session.current.translation}
                       </p>
                     </div>
@@ -486,21 +564,21 @@ function StudyScreenContent({
                   </span>
                 </button>
               ) : (
-                <div className="flex min-h-[21rem] flex-col items-center px-6 py-10 text-center duration-200 animate-in fade-in-0 slide-in-from-bottom-1 sm:min-h-[25rem]">
+                <div className="flex min-h-[21rem] flex-col items-center justify-center px-6 py-10 text-center duration-200 animate-in fade-in-0 slide-in-from-bottom-1 sm:min-h-[25rem]">
                   <span className="text-[10px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
                     {LANGUAGES[selected.sourceLanguage].name}
                   </span>
-                  <p className={`mt-4 max-h-48 max-w-full overflow-y-auto font-display leading-[1.1] font-medium tracking-[-0.03em] whitespace-pre-line break-words ${translationSizeClass(session.current.originalWord)}`}>
+                  <p className={`mt-4 max-h-44 max-w-full overflow-y-auto py-2 font-display leading-[1.25] font-medium tracking-[-0.03em] whitespace-pre-line break-words ${pairedPromptSizeClass(session.current.exampleSentence || session.current.originalWord)}`}>
                     {session.current.originalWord}
                   </p>
-                  <div className="my-5 h-px w-14 bg-border" />
-                  <p className="text-sm text-muted-foreground">
+                  <div className="my-3 h-px w-14 bg-border" />
+                  <p className="max-h-24 overflow-y-auto whitespace-pre-line text-sm text-muted-foreground">
                     {session.current.translation}
                   </p>
 
                   {session.current.exampleSentence ? (
-                    <blockquote className="mx-auto mt-7 max-w-md border-t border-border/70 pt-5">
-                      <p className="text-sm leading-relaxed text-foreground/85">
+                    <blockquote className="mx-auto mt-4 max-h-52 max-w-md overflow-y-auto border-t border-border/70 px-2 py-3">
+                      <p className={`font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words text-foreground/85 ${pairedPromptSizeClass(session.current.exampleSentence)}`}>
                         „{session.current.exampleSentence}”
                       </p>
                       {session.current.exampleTranslation ? (
@@ -572,13 +650,17 @@ function StudyScreenContent({
 
 function StudySummary({
   session,
+  mode,
   contextName,
   onRestart,
+  canRestart,
   onChangeScope,
 }: {
   session: NonNullable<ReturnType<typeof studyReducer>>;
+  mode: "standard" | "daily";
   contextName: string;
   onRestart: () => void;
+  canRestart: boolean;
   onChangeScope: () => void;
 }) {
   const total = session.cards.length;
@@ -601,7 +683,9 @@ function StudySummary({
           Sesja ukończona
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Wszystkie fiszki z tej sesji są już oznaczone jako znane.
+          {mode === "daily"
+            ? "Dzisiejsza powtórka zakończona. Wyniki znajomości zostały zaktualizowane."
+            : "Wszystkie fiszki z tej sesji są już oznaczone jako znane."}
         </p>
       </div>
 
@@ -650,14 +734,16 @@ function StudySummary({
         </div>
       ) : (
         <p className="mt-6 rounded-2xl border border-emerald-600/15 bg-emerald-600/[0.055] px-4 py-3.5 text-center text-sm text-emerald-800 dark:text-emerald-300">
-          Wszystkie słowa znałeś od pierwszego razu. Świetnie!
+          {mode === "daily"
+            ? "Wszystkie odpowiedzi były poprawne. Świetnie!"
+            : "Wszystkie słowa znałeś od pierwszego razu. Świetnie!"}
         </p>
       )}
 
       <div className="mt-7 grid gap-2.5 sm:grid-cols-2">
-        <Button type="button" size="lg" onClick={onRestart}>
+        <Button type="button" size="lg" onClick={onRestart} disabled={!canRestart}>
           <RotateCcw />
-          Ucz się ponownie
+          {canRestart ? "Ucz się ponownie" : "Brak kolejnych słów"}
         </Button>
         <Button type="button" size="lg" variant="outline" onClick={onChangeScope}>
           Zmień zakres

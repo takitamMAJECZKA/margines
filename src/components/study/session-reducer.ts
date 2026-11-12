@@ -1,6 +1,7 @@
 import type { Word } from "@/db/types";
 
 export interface StudyState {
+  mode: "standard" | "daily";
   cards: Word[];
   queue: Word[];
   current: Word | null;
@@ -13,7 +14,7 @@ export interface StudyState {
 }
 
 export type StudyAction =
-  | { type: "start"; words: Word[] }
+  | { type: "start"; words: Word[]; mode: "standard" | "daily" }
   | { type: "reveal" }
   | { type: "answer"; known: boolean }
   | { type: "reset" };
@@ -29,10 +30,14 @@ export function shuffleWords(words: Word[]): Word[] {
   return shuffled;
 }
 
-export function createStudyState(words: Word[]): StudyState {
+export function createStudyState(
+  words: Word[],
+  mode: "standard" | "daily",
+): StudyState {
   const shuffled = shuffleWords(words);
 
   return {
+    mode,
     cards: shuffled,
     queue: shuffled,
     current: shuffled[0] ?? null,
@@ -50,7 +55,7 @@ export function studyReducer(
   action: StudyAction,
 ): StudyState | null {
   if (action.type === "reset") return null;
-  if (action.type === "start") return createStudyState(action.words);
+  if (action.type === "start") return createStudyState(action.words, action.mode);
 
   if (!state || state.finished || !state.current) return state;
 
@@ -81,6 +86,19 @@ export function studyReducer(
   }
 
   misses[word.id] = (misses[word.id] ?? 0) + 1;
+  if (state.mode === "daily") {
+    const queue = state.queue.slice(1);
+    return {
+      ...state,
+      queue,
+      current: queue[0] ?? null,
+      revealed: false,
+      attempts,
+      misses,
+      finished: queue.length === 0,
+    };
+  }
+
   const queue = [...state.queue.slice(1), word];
 
   return {

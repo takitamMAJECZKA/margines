@@ -61,6 +61,16 @@ const DICTIONARY_TYPES = [
     description: "Automatyczne tłumaczenie i przykładowe zdania.",
   },
   {
+    value: "fr-pl",
+    label: "Francuski → polski",
+    baseName: "Francuski",
+    sourceLanguage: "fr",
+    targetLanguage: "pl",
+    isNative: false,
+    defaultColor: "stone",
+    description: "Automatyczne tłumaczenie i przykładowe zdania.",
+  },
+  {
     value: "pl-pl",
     label: "Polski (język ojczysty)",
     baseName: "Polski",
