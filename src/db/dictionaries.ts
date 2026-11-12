@@ -55,7 +55,24 @@ async function assertLanguageAvailable(
 }
 
 export async function listDictionaries(): Promise<Dictionary[]> {
-  return db.dictionaries.orderBy("createdAt").toArray();
+  const dictionaries = await db.dictionaries.toArray();
+  return dictionaries.sort(
+    (left, right) =>
+      (left.sortOrder ?? left.createdAt) - (right.sortOrder ?? right.createdAt),
+  );
+}
+
+export async function reorderDictionaries(ids: string[]): Promise<void> {
+  await db.transaction("rw", db.dictionaries, async () => {
+    const dictionaries = await db.dictionaries.toArray();
+    const byId = new Map(dictionaries.map((dictionary) => [dictionary.id, dictionary]));
+    const ordered = ids.map((id) => byId.get(id)).filter((item) => item !== undefined);
+    const included = new Set(ordered.map((dictionary) => dictionary.id));
+    ordered.push(...dictionaries.filter((dictionary) => !included.has(dictionary.id)));
+    await db.dictionaries.bulkPut(
+      ordered.map((dictionary, sortOrder) => ({ ...dictionary, sortOrder })),
+    );
+  });
 }
 
 export async function getDictionary(id: string): Promise<Dictionary | undefined> {
@@ -113,6 +130,7 @@ export async function createInitialDictionaries(
     return {
       ...values,
       id: createId(),
+      sortOrder: existing.length + index,
       createdAt: now + index,
       updatedAt: now + index,
     } satisfies Dictionary;
@@ -128,9 +146,10 @@ export async function createDictionary(
   const values = validate(draft);
 
   const now = Date.now();
-  const dictionary: Dictionary = {
+  let dictionary: Dictionary = {
     ...values,
     id: createId(),
+    sortOrder: 0,
     createdAt: now,
     updatedAt: now,
   };
@@ -138,6 +157,12 @@ export async function createDictionary(
   await db.transaction("rw", db.dictionaries, async () => {
     await assertLanguageAvailable(values.sourceLanguage);
     await assertNameAvailable(values.name);
+    const dictionaries = await db.dictionaries.toArray();
+    dictionary = {
+      ...dictionary,
+      sortOrder:
+        Math.max(-1, ...dictionaries.map((item) => item.sortOrder ?? -1)) + 1,
+    };
     await db.dictionaries.add(dictionary);
   });
   return dictionary;

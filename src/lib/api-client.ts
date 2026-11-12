@@ -91,10 +91,11 @@ export async function fetchExamples(
   word: string,
   sourceLanguage: ForeignLanguageCode,
   signal?: AbortSignal,
+  excludeIds: string[] = [],
 ): Promise<ExamplesResponse> {
   return postJson<ExamplesResponse>(
     "/api/examples",
-    { word, sourceLanguage },
+    { word, sourceLanguage, excludeIds },
     signal,
     EXAMPLES_TIMEOUT_MS,
   );

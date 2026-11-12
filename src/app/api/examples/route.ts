@@ -23,12 +23,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: firstZodError(parsed.error) }, { status: 400 });
   }
 
-  const { word, sourceLanguage } = parsed.data;
+  const { word, sourceLanguage, excludeIds = [] } = parsed.data;
 
   let payload: ExamplesResponse;
 
   try {
-    const result = await findAuthenticExamples(word, sourceLanguage);
+    const result = await findAuthenticExamples(word, sourceLanguage, excludeIds);
     payload = {
       examples: result.examples,
       examplesError: result.error,

@@ -276,6 +276,10 @@ function StudyScreenContent({
   const total = session?.cards.length ?? words.length;
   const knownCount = session?.knownIds.length ?? 0;
   const progress = total === 0 ? 0 : Math.round((knownCount / total) * 100);
+  const clozePrompt =
+    session?.current && !selected.isNative && session.current.exampleSentence
+      ? clozeSentence(session.current, selected.sourceLanguage)
+      : null;
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -450,24 +454,30 @@ function StudyScreenContent({
                   <span className="text-[10px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
                     {LANGUAGES[selected.targetLanguage].name}
                   </span>
-                  <div className="mt-5 max-h-56 w-full max-w-full overflow-y-auto overscroll-contain px-1">
-                    <p className={`font-display leading-[1.12] font-medium tracking-[-0.03em] whitespace-pre-line break-words ${translationSizeClass(session.current.translation)}`}>
-                    {session.current.translation}
-                    </p>
-                  </div>
-                  {!selected.isNative && session.current.exampleSentence ? (
-                    <div className="mt-5 max-w-full px-2">
-                      <p className="text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+                  {clozePrompt ? (
+                    <div className="mt-5 max-h-56 w-full max-w-full overflow-y-auto overscroll-contain px-1">
+                      <p className="mb-2 text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
                         {LANGUAGES[selected.sourceLanguage].name} · uzupełnij słowo
                       </p>
-                      {(() => {
-                        const cloze = clozeSentence(session.current, selected.sourceLanguage);
-                        return cloze ? (
-                          <p className="mt-1.5 text-sm leading-relaxed text-foreground/85 sm:text-base">
-                            „{cloze}”
-                          </p>
-                        ) : null;
-                      })()}
+                      <p className={`font-display leading-[1.15] font-medium tracking-[-0.025em] whitespace-pre-line break-words ${translationSizeClass(clozePrompt)}`}>
+                        „{clozePrompt}”
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-5 max-h-56 w-full max-w-full overflow-y-auto overscroll-contain px-1">
+                      <p className={`font-display leading-[1.12] font-medium tracking-[-0.03em] whitespace-pre-line break-words ${translationSizeClass(session.current.translation)}`}>
+                        {session.current.translation}
+                      </p>
+                    </div>
+                  )}
+                  {clozePrompt ? (
+                    <div className="mt-4 max-h-20 max-w-full overflow-y-auto px-2">
+                      <p className="text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+                        Po polsku
+                      </p>
+                      <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-foreground/80">
+                        {session.current.translation}
+                      </p>
                     </div>
                   ) : null}
                   <span className="mt-8 inline-flex items-center gap-1.5 text-xs text-muted-foreground">

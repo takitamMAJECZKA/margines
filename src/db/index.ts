@@ -64,6 +64,30 @@ class MarginesDatabase extends Dexie {
       sets: "id, dictionaryId, [dictionaryId+createdAt], createdAt",
       setWords: "id, setId, wordId, dictionaryId, [setId+createdAt]",
     });
+
+    // v4 — keep the user's custom dictionary tab order across reloads.
+    this.version(4)
+      .stores({
+        dictionaries: "id, name, sourceLanguage, createdAt, sortOrder",
+        words:
+          "id, dictionaryId, [dictionaryId+normalizedWord], [dictionaryId+createdAt], createdAt",
+        meta: "key",
+        lookups: "key, createdAt",
+        sets: "id, dictionaryId, [dictionaryId+createdAt], createdAt",
+        setWords: "id, setId, wordId, dictionaryId, [setId+createdAt]",
+      })
+      .upgrade(async (transaction) => {
+        const dictionaries = await transaction
+          .table<Dictionary>("dictionaries")
+          .orderBy("createdAt")
+          .toArray();
+        await transaction.table<Dictionary>("dictionaries").bulkPut(
+          dictionaries.map((dictionary, sortOrder) => ({
+            ...dictionary,
+            sortOrder,
+          })),
+        );
+      });
   }
 }
 

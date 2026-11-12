@@ -9,6 +9,7 @@ export interface Dictionary {
   targetLanguage: LanguageCode;
   isNative: boolean;
   color: DictionaryColor;
+  sortOrder?: number;
   createdAt: number;
   updatedAt: number;
 }

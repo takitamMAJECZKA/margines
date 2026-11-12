@@ -18,9 +18,9 @@ const EXAMPLE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 // Empty answers are cached briefly so repeated lookups do not hammer Tatoeba,
 // while failures are never cached — an immediate retry must be able to succeed.
 const EXAMPLE_EMPTY_CACHE_TTL_MS = 2 * 60 * 1000;
-// One good example is enough for the add-word preview and keeps the payload
-// small; Tatoeba itself is queried once for both language variants.
-const MAX_EXAMPLES = 1;
+// Keep several examples in cache so editing a word can offer an alternative
+// without immediately repeating the same Tatoeba sentence.
+const MAX_EXAMPLES = 8;
 
 interface TatoebaTranslation {
   id: number;
@@ -216,11 +216,17 @@ function issueFromTatoebaError(error: unknown): ApiIssue | null {
 export async function findAuthenticExamples(
   word: string,
   sourceLanguage: LanguageCode,
+  excludeIds: string[] = [],
 ): Promise<TatoebaSearchResult> {
   const cacheKey = `tatoeba:${sourceLanguage}:${word.normalize("NFC").toLocaleLowerCase("pl")}`;
   const cached = serverCache.get<TatoebaSearchResult>(cacheKey);
   if (cached) {
-    return { ...cached, examples: cached.examples.slice(0, MAX_EXAMPLES) };
+    const examples = cached.examples
+      .filter((example) => !excludeIds.includes(example.id))
+      .slice(0, MAX_EXAMPLES);
+    if (examples.length > 0) {
+      return { ...cached, examples };
+    }
   }
 
   const deadline = new AbortController();
@@ -250,7 +256,9 @@ export async function findAuthenticExamples(
       collectExamples(fallback.value, word, seen, examples);
     }
 
-    const ranked = rankExamples(examples).slice(0, MAX_EXAMPLES);
+    const ranked = rankExamples(examples)
+      .filter((example) => !excludeIds.includes(example.id))
+      .slice(0, MAX_EXAMPLES);
     const firstError =
       ranked.length === 0
         ? ([translated, fallback].find(

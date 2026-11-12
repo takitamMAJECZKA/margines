@@ -21,7 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { listDictionaries } from "@/db/dictionaries";
+import { listDictionaries, reorderDictionaries } from "@/db/dictionaries";
 import { isOnboardingComplete } from "@/db/seed";
 import { listSetIdsForWord, listSetMemberships, listSets } from "@/db/sets";
 import type { Dictionary, SetWord, Word, WordSet } from "@/db/types";
@@ -32,6 +32,7 @@ import {
   DICTIONARY_COLOR_HEX,
   languagePairLabel,
 } from "@/lib/languages";
+import type { ForeignLanguageCode } from "@/lib/languages";
 import { foldForSearch, wordCountLabel } from "@/lib/utils";
 
 import { AddWordDialog } from "./add-word-dialog";
@@ -243,6 +244,12 @@ export function Dashboard() {
         selectedId={selectedId}
         onSelect={select}
         onCreate={() => setCreateOpen(true)}
+        onReorder={(ids) => {
+          void reorderDictionaries(ids).catch((error) => {
+            console.error(error);
+            toast.error("Nie udało się zmienić kolejności słowników.");
+          });
+        }}
       />
 
       {databaseError ? (
@@ -591,6 +598,11 @@ export function Dashboard() {
         word={editingWord}
         sets={sets}
         initialSetIds={editingSetIds}
+        sourceLanguage={
+          selected && !selected.isNative
+            ? (selected.sourceLanguage as ForeignLanguageCode)
+            : null
+        }
       />
 
       <DeleteWordDialog

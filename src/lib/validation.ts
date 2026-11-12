@@ -125,6 +125,7 @@ export type LookupRequest = z.infer<typeof lookupRequestSchema>;
 export const examplesRequestSchema = z.object({
   word: z.string().trim().min(1).max(80),
   sourceLanguage: foreignLanguageCodeSchema,
+  excludeIds: z.array(z.string().max(40)).max(20).optional(),
 });
 
 export type ExamplesRequest = z.infer<typeof examplesRequestSchema>;

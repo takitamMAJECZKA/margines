@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, RefreshCw, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { DuplicateWordError, ValidationError } from "@/db/errors";
 import type { Word, WordSet } from "@/db/types";
 import { updateWord } from "@/db/words";
+import { fetchExamples, ApiClientError } from "@/lib/api-client";
+import type { ForeignLanguageCode } from "@/lib/languages";
 import { firstZodError, wordDraftSchema } from "@/lib/validation";
+import type { AuthenticExample } from "@/types/api";
 
 interface EditWordDialogProps {
   open: boolean;
@@ -28,6 +31,7 @@ interface EditWordDialogProps {
   word: Word | null;
   sets?: WordSet[];
   initialSetIds?: string[];
+  sourceLanguage: ForeignLanguageCode | null;
 }
 
 export function EditWordDialog({
@@ -36,12 +40,69 @@ export function EditWordDialog({
   word,
   sets = [],
   initialSetIds = [],
+  sourceLanguage,
 }: EditWordDialogProps) {
   const [originalWord, setOriginalWord] = useState(word?.originalWord ?? "");
   const [translation, setTranslation] = useState(word?.translation ?? "");
+  const [alternativeExample, setAlternativeExample] = useState<AuthenticExample | null>(null);
+  const [searchedExampleIds, setSearchedExampleIds] = useState<string[]>([]);
+  const [searchingExample, setSearchingExample] = useState(false);
+  const [exampleError, setExampleError] = useState<string | null>(null);
   const [selectedSetIds, setSelectedSetIds] = useState(initialSetIds);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const displayedExample = alternativeExample?.text ?? word?.exampleSentence ?? "";
+
+  async function searchAnotherExample() {
+    if (!word || !sourceLanguage || searchingExample) return;
+
+    const searchWord = originalWord.trim().replace(
+      sourceLanguage === "de"
+        ? /^(?:der|die|das|den|dem|des)\s+/i
+        : sourceLanguage === "es"
+          ? /^(?:el|la|los|las|un|una|unos|unas)\s+/i
+          : /^(?:a|an|the)\s+/i,
+      "",
+    );
+    if (!searchWord) return;
+
+    const currentId = /\/show\/(\d+)/.exec(word.exampleSourceUrl)?.[1];
+    const excluded = Array.from(
+      new Set([
+        ...(currentId ? [currentId] : []),
+        ...searchedExampleIds,
+        ...(alternativeExample ? [alternativeExample.id] : []),
+      ]),
+    );
+
+    setSearchingExample(true);
+    setExampleError(null);
+    try {
+      const result = await fetchExamples(searchWord, sourceLanguage, undefined, excluded);
+      const next = result.examples.find(
+        (example) =>
+          example.text.toLocaleLowerCase() !== word.exampleSentence.toLocaleLowerCase() &&
+          example.text.toLocaleLowerCase() !== displayedExample.toLocaleLowerCase(),
+      );
+      if (!next) {
+        setExampleError(
+          result.examplesError?.message ?? "Nie znaleziono innego przykładu w Tatoeba.",
+        );
+        return;
+      }
+      setAlternativeExample(next);
+      setSearchedExampleIds((current) => [...current, next.id]);
+    } catch (cause) {
+      setExampleError(
+        cause instanceof ApiClientError
+          ? cause.message
+          : "Nie udało się pobrać zdania z Tatoeba.",
+      );
+    } finally {
+      setSearchingExample(false);
+    }
+  }
 
   function toggleSet(setId: string) {
     setSelectedSetIds((current) =>
@@ -58,12 +119,12 @@ export function EditWordDialog({
     const draft = {
       originalWord,
       translation,
-      exampleSentence: word.exampleSentence,
-      exampleTranslation: word.exampleTranslation,
-      exampleType: word.exampleType,
-      exampleSource: word.exampleSource,
-      exampleSourceUrl: word.exampleSourceUrl,
-      exampleAttribution: word.exampleAttribution,
+      exampleSentence: alternativeExample?.text ?? word.exampleSentence,
+      exampleTranslation: alternativeExample?.translation ?? word.exampleTranslation,
+      exampleType: alternativeExample ? "authentic" : word.exampleType,
+      exampleSource: alternativeExample ? "Tatoeba" : word.exampleSource,
+      exampleSourceUrl: alternativeExample?.sourceUrl ?? word.exampleSourceUrl,
+      exampleAttribution: alternativeExample?.attribution ?? word.exampleAttribution,
     };
 
     const parsed = wordDraftSchema.safeParse(draft);
@@ -97,7 +158,7 @@ export function EditWordDialog({
         <DialogHeader>
           <DialogTitle>Edytuj słowo</DialogTitle>
           <DialogDescription>
-            Popraw słowo i tłumaczenie. Przykład zdania jest tylko do odczytu.
+            Popraw słowo i tłumaczenie. Przykład możesz zmienić, wybierając inne zdanie z Tatoeba.
           </DialogDescription>
         </DialogHeader>
 
@@ -133,24 +194,43 @@ export function EditWordDialog({
           </div>
 
           <div className="grid gap-3 rounded-xl border border-border/80 bg-card/40 p-3.5">
-            <Label>Przykład zdania</Label>
-            {word?.exampleSentence ? (
+            <Label>Przykładowe zdanie</Label>
+            {displayedExample ? (
               <blockquote className="border-l-2 border-border/90 pl-3">
                 <p className="text-sm leading-relaxed text-foreground/85">
-                  „{word.exampleSentence}”
+                  „{displayedExample}”
                 </p>
-                {word.exampleTranslation ? (
+                {(alternativeExample?.translation ?? word?.exampleTranslation) ? (
                   <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-                    {word.exampleTranslation}
+                    {alternativeExample?.translation ?? word?.exampleTranslation}
                   </p>
+                ) : null}
+                {alternativeExample ? (
+                  <p className="mt-1 text-[10px] font-medium text-primary">Nowe zdanie z Tatoeba</p>
                 ) : null}
               </blockquote>
             ) : (
               <p className="text-sm text-muted-foreground">Brak przykładu.</p>
             )}
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Przykładu zdania nie można edytować.
-            </p>
+            {sourceLanguage ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void searchAnotherExample()}
+                disabled={searchingExample}
+              >
+                {searchingExample ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                {word?.exampleSentence || alternativeExample
+                  ? "Szukaj innego zdania z Tatoeba"
+                  : "Szukaj zdania w Tatoeba"}
+              </Button>
+            ) : null}
+            {exampleError ? (
+              <p role="status" className="text-xs leading-relaxed text-muted-foreground">
+                {exampleError}
+              </p>
+            ) : null}
           </div>
 
           <fieldset className="grid gap-2.5 rounded-xl border border-border/80 bg-card/40 p-3.5">
