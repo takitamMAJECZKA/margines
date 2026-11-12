@@ -559,6 +559,7 @@ export function Dashboard() {
             dictionary={selected}
             initialWord={addWordRequest?.initialWord ?? ""}
             setIds={activeSet ? [activeSet.id] : []}
+            onAdded={() => updateSearch("")}
           />
           <SetFormDialog
             key={`set-form-${editingSet?.id ?? "new"}-${

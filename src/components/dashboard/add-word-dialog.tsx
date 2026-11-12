@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { AlertCircle, Loader2, Search } from "lucide-react";
 
@@ -61,6 +61,7 @@ interface AddWordDialogProps {
   initialWord?: string;
   /** Sets the new word is automatically added to. */
   setIds?: string[];
+  onAdded?: () => void;
 }
 
 export function AddWordDialog({
@@ -69,17 +70,20 @@ export function AddWordDialog({
   dictionary,
   initialWord = "",
   setIds = [],
+  onAdded,
 }: AddWordDialogProps) {
   const [phase, setPhase] = useState<"input" | "preview">("input");
   const [word, setWord] = useState(initialWord);
   const [inputError, setInputError] = useState<string | null>(null);
   const [enrichment, setEnrichment] = useState<EnrichResponse | null>(null);
   const [examplesLoading, setExamplesLoading] = useState(false);
+  const [nativeLookupPending, setNativeLookupPending] = useState(false);
 
   const enrichmentRef = useRef<EnrichResponse | null>(null);
   const examplesAbortRef = useRef<AbortController | null>(null);
   const examplesRequestRef = useRef(0);
   const savedWordIdRef = useRef<string | null>(null);
+  const autoStartedRef = useRef(false);
 
   const sourceLanguage: ForeignLanguageCode | null = dictionary.isNative
     ? null
@@ -218,6 +222,7 @@ export function AddWordDialog({
     cancelExamples();
 
     if (!sourceLanguage) {
+      setNativeLookupPending(true);
       try {
         const result = await fetchDefinition(text);
         setCurrentEnrichment({
@@ -231,6 +236,8 @@ export function AddWordDialog({
         });
       } catch (error) {
         setCurrentEnrichment(failedEnrichment(text, error instanceof ApiClientError ? error.message : "Nie udało się pobrać definicji."));
+      } finally {
+        setNativeLookupPending(false);
       }
       setPhase("preview");
       return;
@@ -273,9 +280,20 @@ export function AddWordDialog({
     void loadExamples(current.word, key);
   }
 
+  useEffect(() => {
+    if (!open || !initialWord.trim() || autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    void runLookup(false);
+    // This dialog is keyed by dictionary and initialWord; the first render
+    // already contains the exact lookup value that should be submitted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialWord, open]);
+
+  const lookupPending = lookupMutation.isPending || nativeLookupPending;
+
   function handleInputSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (lookupMutation.isPending) return;
+    if (lookupPending) return;
     void runLookup(false);
   }
 
@@ -332,7 +350,7 @@ export function AddWordDialog({
                   spellCheck={false}
                   enterKeyHint="search"
                   maxLength={80}
-                  disabled={lookupMutation.isPending}
+                  disabled={lookupPending}
                   aria-invalid={Boolean(inputError)}
                   className="h-14 text-lg"
                 />
@@ -353,7 +371,7 @@ export function AddWordDialog({
                 </p>
               ) : null}
 
-              {lookupMutation.isPending ? (
+              {lookupPending ? (
                 <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/50 px-3.5 py-3 text-xs text-muted-foreground">
                   <Loader2 className="size-4 animate-spin text-primary" />
                   Szukam tłumaczenia…
@@ -362,12 +380,12 @@ export function AddWordDialog({
 
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={lookupMutation.isPending}>
+                  <Button type="button" variant="outline" disabled={lookupPending}>
                     Anuluj
                   </Button>
                 </DialogClose>
-                <Button type="submit" disabled={lookupMutation.isPending}>
-                  {lookupMutation.isPending ? (
+                <Button type="submit" disabled={lookupPending}>
+                  {lookupPending ? (
                     <Loader2 className="animate-spin" />
                   ) : (
                     <Search />
@@ -401,6 +419,7 @@ export function AddWordDialog({
               if (firstExample && !savedWord.exampleSentence) {
                 void attachExampleIfEmpty(savedWord.id, firstExample);
               }
+              onAdded?.();
             }}
           />
         )}
