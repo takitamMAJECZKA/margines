@@ -127,32 +127,6 @@ function spanishArticle(section: string, headword: string): string | null {
   return null;
 }
 
-function englishArticle(word: string): string {
-  const lower = word.toLocaleLowerCase("en");
-
-  // Acronyms and letter names: an MRI, an FBI agent, an X-ray, a UFO.
-  if (/^[A-Z]{2,}/.test(word)) {
-    return /^[AEFHILMNORSX]/.test(word) ? "an" : "a";
-  }
-
-  if (/^[AEFHILMNORSX](?![a-z])/.test(word)) return "an";
-
-  // Silent h and consonant-sounding vowels.
-  if (/^(hour|honest|honor|honour|heir|herb)/.test(lower)) return "an";
-  if (/^(uni|use|usu|uti|ure|uro|ubi|eu|ewe|one|once|ouija)/.test(lower)) {
-    return "a";
-  }
-
-  return /^[aeiou]/.test(lower) ? "an" : "a";
-}
-
-function isEnglishNoun(section: string): boolean {
-  return (
-    /\{\{en-noun\b/i.test(section) ||
-    /\{\{head\s*\|\s*en\s*\|\s*noun\b/i.test(section)
-  );
-}
-
 function hasArticle(word: string, language: ForeignLanguageCode): boolean {
   if (language === "de") {
     return /^(der|die|das|den|dem|des)\s+/i.test(word);
@@ -176,7 +150,7 @@ function capitalizeFirst(value: string): string {
 /**
  * Look up whether an entered foreign word is a noun in Wiktionary and, if so,
  * choose its article. The article is appended to the saved headword so the
- * user does not have to remember German or Spanish gender while reading.
+ * user does not have to remember noun gender while reading.
  */
 export async function findArticle(
   baseWord: string,
@@ -187,6 +161,11 @@ export async function findArticle(
   // Multi-word phrases and words that already contain an article are left
   // untouched; adding a second article would be wrong.
   if (!input || input.includes(" ") || hasArticle(input, language)) {
+    return { word: input, article: null, applied: false };
+  }
+
+  // English nouns do not have grammatical gender; don't prepend a/an.
+  if (language === "en") {
     return { word: input, article: null, applied: false };
   }
 
@@ -216,8 +195,6 @@ export async function findArticle(
     article = spanishArticle(section, headword);
   } else if (language === "fr") {
     article = frenchArticle(section);
-  } else if (isEnglishNoun(section)) {
-    article = englishArticle(headword);
   }
 
   if (!article) {

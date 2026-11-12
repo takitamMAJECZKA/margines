@@ -186,7 +186,17 @@ export function AddWordDialog({
 
       if (!force) {
         const cached = await getCachedLookup(key);
-        if (cached) return { response: cached, key };
+        if (cached) {
+          const response =
+            sourceLanguage === "en" && cached.articleApplied && cached.baseWord
+              ? {
+                  ...cached,
+                  word: cached.baseWord,
+                  articleApplied: false,
+                }
+              : cached;
+          return { response, key };
+        }
       }
 
       if (inputLanguage === "pl") {
