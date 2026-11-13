@@ -64,7 +64,12 @@ export function SwipeableCard({
     };
     horizontalRef.current = false;
     setDragging(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
+    // Keep mouse drags captured immediately. For touch, wait until the user
+    // clearly chooses a horizontal gesture so the browser can still start a
+    // vertical page scroll without cancelling a swipe prematurely.
+    if (event.pointerType !== "touch") {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
@@ -78,7 +83,7 @@ export function SwipeableCard({
       if (Math.abs(deltaX) < 8 && Math.abs(deltaY) < 8) return;
 
       // Vertical gestures belong to page scrolling.
-      if (Math.abs(deltaY) >= Math.abs(deltaX)) {
+      if (Math.abs(deltaY) >= Math.abs(deltaX) * 1.1) {
         startRef.current = null;
         offsetRef.current = 0;
         setDragging(false);
@@ -87,7 +92,15 @@ export function SwipeableCard({
       }
 
       horizontalRef.current = true;
+      if (event.pointerType === "touch") {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
     }
+
+    // touch-action: pan-y lets the page handle vertical motion. Once this is
+    // clearly a horizontal swipe, prevent any remaining browser gesture from
+    // stealing it.
+    if (event.cancelable) event.preventDefault();
 
     const resistance = 1 - Math.min(Math.abs(deltaX) / 900, 0.3);
     const nextOffset =

@@ -124,6 +124,10 @@ async function searchTatoeba(
   if (withPolishTranslation) {
     params.set("trans:lang", "pol");
     params.set("showtrans", "matching");
+  } else {
+    // The fallback search is intentionally broader, but still request linked
+    // translations so it can contribute Polish meanings when available.
+    params.set("showtrans", "all");
   }
 
   const response = await fetchWithTimeout(`${TATOEBA_API}?${params.toString()}`, {
@@ -185,7 +189,19 @@ function collectExamples(
     if (!mapped) continue;
 
     const key = mapped.text.toLocaleLowerCase("pl");
-    if (seen.has(key)) continue;
+    if (seen.has(key)) {
+      // A sentence can appear in both searches. The filtered search may return
+      // it without its matching translation payload; keep the enriched copy
+      // from the fallback instead of losing the Polish meaning to deduplication.
+      const existingIndex = target.findIndex(
+        (example) => example.text.toLocaleLowerCase("pl") === key,
+      );
+      const existing = existingIndex >= 0 ? target[existingIndex] : undefined;
+      if (existing && !existing.translation && mapped.translation) {
+        target[existingIndex] = mapped;
+      }
+      continue;
+    }
 
     seen.add(key);
     target.push(mapped);
