@@ -220,6 +220,7 @@ function StudyScreenContent({
       : words ?? [];
 
   const [session, dispatch] = useReducer(studyReducer, null);
+  const isStudying = Boolean(session && !session.finished);
 
   function startSession() {
     if (studyWords.length === 0) return;
@@ -250,6 +251,49 @@ function StudyScreenContent({
       console.error("Could not save flashcard appearance", error);
     });
   }, [currentWordId, sessionAttempts]);
+
+  useEffect(() => {
+    if (!isStudying) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY;
+    const previousHtml = {
+      overflow: html.style.overflow,
+      overscrollBehavior: html.style.overscrollBehavior,
+      touchAction: html.style.touchAction,
+    };
+    const previousBody = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+      overscrollBehavior: body.style.overscrollBehavior,
+      touchAction: body.style.touchAction,
+    };
+
+    // Lock the document itself, including mobile browsers that continue to
+    // scroll the body even when the study view has overflow hidden.
+    html.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+    html.style.touchAction = "none";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+    body.style.touchAction = "none";
+
+    return () => {
+      Object.assign(html.style, previousHtml);
+      Object.assign(body.style, previousBody);
+      window.scrollTo(0, scrollY);
+    };
+  }, [isStudying]);
 
   useEffect(() => {
     if (!session || session.finished) return;
@@ -349,7 +393,7 @@ function StudyScreenContent({
   return (
     <div
       className={
-        session && !session.finished
+        isStudying
           ? "flex h-dvh touch-none flex-col overflow-hidden overscroll-none"
           : "flex min-h-dvh flex-col"
       }
