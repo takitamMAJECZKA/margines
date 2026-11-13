@@ -582,7 +582,10 @@ function StudyScreenContent({
                         „{session.current.exampleSentence}”
                       </p>
                       {session.current.exampleTranslation ? (
-                        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                        <p className="mt-2 border-t border-border/50 pt-2 text-xs leading-relaxed text-muted-foreground">
+                          <span className="font-medium text-muted-foreground/80">
+                            Po polsku: {" "}
+                          </span>
                           {session.current.exampleTranslation}
                         </p>
                       ) : null}
