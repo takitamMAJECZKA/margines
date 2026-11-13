@@ -347,7 +347,13 @@ function StudyScreenContent({
       : null;
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div
+      className={
+        session && !session.finished
+          ? "flex h-dvh touch-none flex-col overflow-hidden overscroll-none"
+          : "flex min-h-dvh flex-col"
+      }
+    >
       <StudyHeader />
 
       {!session ? (
@@ -475,7 +481,7 @@ function StudyScreenContent({
           onChangeScope={() => dispatch({ type: "reset" })}
         />
       ) : (
-        <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-6 pb-10 sm:px-6 sm:pt-9">
+        <main className="mx-auto min-h-0 w-full max-w-xl flex-1 overflow-hidden px-4 pt-4 pb-4 sm:px-6 sm:pt-9 sm:pb-10">
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="truncate font-medium text-foreground">
               {scopedSet?.name ?? selected.name}
