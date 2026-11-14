@@ -1,4 +1,4 @@
-import { BookOpen, FolderOpen, Plus, SearchX } from "lucide-react";
+import { BookOpen, FolderOpen, ListPlus, Plus, SearchX } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -52,11 +52,11 @@ export function NoDictionaries({ onCreate }: { onCreate: () => void }) {
 export function EmptySet({
   setName,
   onAdd,
-  onShowAll,
+  onAssign,
 }: {
   setName: string;
   onAdd: () => void;
-  onShowAll: () => void;
+  onAssign: () => void;
 }) {
   return (
     <div className="mt-8 rounded-3xl border border-dashed border-border bg-card/35 px-6 py-12 text-center">
@@ -68,11 +68,12 @@ export function EmptySet({
       </h2>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
         Zestaw „{setName}” nie ma jeszcze słów. Dodaj nowe słowo albo przypisz
-        istniejące słowa w oknie edycji.
+        istniejące z tego słownika.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-2">
-        <Button variant="outline" onClick={onShowAll}>
-          Wszystkie zestawy
+        <Button variant="outline" onClick={onAssign}>
+          <ListPlus />
+          Przypisz słowa
         </Button>
         <Button onClick={onAdd}>
           <Plus />

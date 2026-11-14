@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   AlertCircle,
+  ArrowLeft,
   FolderOpen,
-  ListPlus,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -378,16 +378,14 @@ export function Dashboard() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <Button
+                    <button
                       type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setAssignWordsOpen(true)}
-                      className="-ml-1 h-9"
+                      onClick={() => selectSet(null)}
+                      className="-ml-1 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
                     >
-                      <ListPlus aria-hidden="true" />
-                      Przypisz słowa
-                    </Button>
+                      <ArrowLeft className="size-3.5" aria-hidden="true" />
+                      Wszystkie zestawy
+                    </button>
                     <div className="mt-2 flex items-center gap-2.5">
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                         <FolderOpen className="size-[18px]" aria-hidden="true" />
@@ -485,7 +483,7 @@ export function Dashboard() {
                 <EmptySet
                   setName={activeSet.name}
                   onAdd={() => openAddWord(search.trim())}
-                  onShowAll={() => selectSet(null)}
+                  onAssign={() => setAssignWordsOpen(true)}
                 />
               ) : (
                 <EmptyDictionary
