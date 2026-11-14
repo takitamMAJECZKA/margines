@@ -143,6 +143,49 @@ export async function removeWordFromSet(
   await db.setWords.delete(`${setId}:${wordId}`);
 }
 
+/** Replaces all words in one set without changing their other set memberships. */
+export async function assignWordsToSet(
+  setId: string,
+  dictionaryId: string,
+  wordIds: string[],
+): Promise<void> {
+  const uniqueWordIds = [...new Set(wordIds)];
+
+  await db.transaction("rw", db.sets, db.words, db.setWords, async () => {
+    const [set, words, currentMemberships] = await Promise.all([
+      db.sets.get(setId),
+      db.words.bulkGet(uniqueWordIds),
+      db.setWords.where("setId").equals(setId).toArray(),
+    ]);
+
+    if (!set || set.dictionaryId !== dictionaryId) {
+      throw new ValidationError("Nie znaleziono tego zestawu w słowniku.");
+    }
+    if (
+      words.some((word) => !word || word.dictionaryId !== dictionaryId)
+    ) {
+      throw new ValidationError("Nie można przypisać słowa z innego słownika.");
+    }
+
+    const existingByWord = new Map(
+      currentMemberships.map((membership) => [membership.wordId, membership]),
+    );
+    await db.setWords.where("setId").equals(setId).delete();
+    if (uniqueWordIds.length === 0) return;
+
+    const now = Date.now();
+    await db.setWords.bulkPut(
+      uniqueWordIds.map((wordId) => ({
+        id: `${setId}:${wordId}`,
+        setId,
+        wordId,
+        dictionaryId,
+        createdAt: existingByWord.get(wordId)?.createdAt ?? now,
+      })),
+    );
+  });
+}
+
 /**
  * Replaces every membership for one word. Called inside the word write
  * transaction so a word and its sets are saved atomically.

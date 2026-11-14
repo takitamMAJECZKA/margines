@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   AlertCircle,
-  ArrowLeft,
   FolderOpen,
+  ListPlus,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -36,6 +36,7 @@ import type { ForeignLanguageCode } from "@/lib/languages";
 import { foldForSearch, wordCountLabel } from "@/lib/utils";
 
 import { AddWordDialog } from "./add-word-dialog";
+import { AssignWordsDialog } from "./assign-words-dialog";
 import { CreateDictionaryDialog } from "./create-dictionary-dialog";
 import { DashboardFooter } from "./dashboard-footer";
 import { DashboardSkeleton } from "./dashboard-skeleton";
@@ -116,6 +117,7 @@ export function Dashboard() {
     null,
   );
   const [setFormOpen, setSetFormOpen] = useState(false);
+  const [assignWordsOpen, setAssignWordsOpen] = useState(false);
   const [editingSet, setEditingSet] = useState<WordSet | null>(null);
   const [deletingSet, setDeletingSet] = useState<WordSet | null>(null);
   const [editingWord, setEditingWord] = useState<Word | null>(null);
@@ -218,6 +220,12 @@ export function Dashboard() {
     ? memberships
         .filter((membership) => membership.wordId === editingWord.id)
         .map((membership) => membership.setId)
+    : [];
+
+  const activeSetWordIds = activeSet
+    ? memberships
+        .filter((membership) => membership.setId === activeSet.id)
+        .map((membership) => membership.wordId)
     : [];
 
   const totalWordCount = allWords.length;
@@ -370,14 +378,16 @@ export function Dashboard() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <button
+                    <Button
                       type="button"
-                      onClick={() => selectSet(null)}
-                      className="-ml-1 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAssignWordsOpen(true)}
+                      className="-ml-1 h-9"
                     >
-                      <ArrowLeft className="size-3.5" aria-hidden="true" />
-                      Wszystkie zestawy
-                    </button>
+                      <ListPlus aria-hidden="true" />
+                      Przypisz słowa
+                    </Button>
                     <div className="mt-2 flex items-center gap-2.5">
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                         <FolderOpen className="size-[18px]" aria-hidden="true" />
@@ -533,6 +543,17 @@ export function Dashboard() {
 
       {selected ? (
         <>
+          {activeSet ? (
+            <AssignWordsDialog
+              key={`assign-words-${activeSet.id}-${assignWordsOpen ? "open" : "closed"}`}
+              open={assignWordsOpen}
+              onOpenChange={setAssignWordsOpen}
+              dictionary={selected}
+              wordSet={activeSet}
+              words={allWords}
+              assignedWordIds={activeSetWordIds}
+            />
+          ) : null}
           <RenameDictionaryDialog
             key={`rename-${selected.id}-${renameOpen ? "open" : "closed"}`}
             open={renameOpen}
