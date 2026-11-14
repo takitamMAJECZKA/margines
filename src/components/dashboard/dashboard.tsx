@@ -6,6 +6,7 @@ import {
   AlertCircle,
   ArrowLeft,
   FolderOpen,
+  ListPlus,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -95,6 +96,14 @@ export function Dashboard() {
     setSetState({ dictionaryId: selectedId, setId });
   }
 
+  function handleDictionaryTabSelect(dictionaryId: string) {
+    if (dictionaryId === selectedId && activeSetId) {
+      selectSet(null);
+      return;
+    }
+    select(dictionaryId);
+  }
+
   const activeSet = useMemo(
     () => (activeSetId ? (sets?.find((set) => set.id === activeSetId) ?? null) : null),
     [activeSetId, sets],
@@ -117,7 +126,7 @@ export function Dashboard() {
     null,
   );
   const [setFormOpen, setSetFormOpen] = useState(false);
-  const [assignWordsOpen, setAssignWordsOpen] = useState(false);
+  const [assigningSet, setAssigningSet] = useState<WordSet | null>(null);
   const [editingSet, setEditingSet] = useState<WordSet | null>(null);
   const [deletingSet, setDeletingSet] = useState<WordSet | null>(null);
   const [editingWord, setEditingWord] = useState<Word | null>(null);
@@ -222,9 +231,9 @@ export function Dashboard() {
         .map((membership) => membership.setId)
     : [];
 
-  const activeSetWordIds = activeSet
+  const assigningSetWordIds = assigningSet
     ? memberships
-        .filter((membership) => membership.setId === activeSet.id)
+        .filter((membership) => membership.setId === assigningSet.id)
         .map((membership) => membership.wordId)
     : [];
 
@@ -250,7 +259,7 @@ export function Dashboard() {
       <DictionaryTabs
         dictionaries={dictionaries}
         selectedId={selectedId}
-        onSelect={select}
+        onSelect={handleDictionaryTabSelect}
         onCreate={() => setCreateOpen(true)}
         onReorder={(ids) => {
           void reorderDictionaries(ids).catch((error) => {
@@ -416,6 +425,10 @@ export function Dashboard() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => setAssigningSet(activeSet)}>
+                        <ListPlus />
+                        Przypisz słowa
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => {
                           setEditingSet(activeSet);
@@ -461,6 +474,7 @@ export function Dashboard() {
                     setEditingSet(null);
                     setSetFormOpen(true);
                   }}
+                  onAssign={setAssigningSet}
                   onRename={(wordSet) => {
                     setEditingSet(wordSet);
                     setSetFormOpen(true);
@@ -483,7 +497,7 @@ export function Dashboard() {
                 <EmptySet
                   setName={activeSet.name}
                   onAdd={() => openAddWord(search.trim())}
-                  onAssign={() => setAssignWordsOpen(true)}
+                  onAssign={() => setAssigningSet(activeSet)}
                 />
               ) : (
                 <EmptyDictionary
@@ -541,15 +555,17 @@ export function Dashboard() {
 
       {selected ? (
         <>
-          {activeSet ? (
+          {assigningSet ? (
             <AssignWordsDialog
-              key={`assign-words-${activeSet.id}-${assignWordsOpen ? "open" : "closed"}`}
-              open={assignWordsOpen}
-              onOpenChange={setAssignWordsOpen}
+              key={`assign-words-${assigningSet.id}`}
+              open
+              onOpenChange={(open) => {
+                if (!open) setAssigningSet(null);
+              }}
               dictionary={selected}
-              wordSet={activeSet}
+              wordSet={assigningSet}
               words={allWords}
-              assignedWordIds={activeSetWordIds}
+              assignedWordIds={assigningSetWordIds}
             />
           ) : null}
           <RenameDictionaryDialog

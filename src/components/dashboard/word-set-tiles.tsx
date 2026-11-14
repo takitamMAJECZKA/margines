@@ -1,6 +1,14 @@
 "use client";
 
-import { FolderOpen, Layers, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  FolderOpen,
+  Layers,
+  ListPlus,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +28,7 @@ interface WordSetTilesProps {
   activeSetId: string | null;
   onSelect: (id: string | null) => void;
   onCreate: () => void;
+  onAssign: (set: WordSet) => void;
   onRename: (set: WordSet) => void;
   onDelete: (set: WordSet) => void;
 }
@@ -35,6 +44,7 @@ export function WordSetTiles({
   activeSetId,
   onSelect,
   onCreate,
+  onAssign,
   onRename,
   onDelete,
 }: WordSetTilesProps) {
@@ -102,6 +112,10 @@ export function WordSetTiles({
               <DropdownMenuItem onSelect={() => onSelect(set.id)}>
                 <FolderOpen />
                 Otwórz zestaw
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onAssign(set)}>
+                <ListPlus />
+                Przypisz słowa
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onRename(set)}>
                 <Pencil />
