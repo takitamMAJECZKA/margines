@@ -21,6 +21,7 @@ import type { Dictionary } from "@/db/types";
 import { attachExampleIfEmpty, findWordByText } from "@/db/words";
 import { ApiClientError, fetchArticle, fetchDefinition, fetchEnrichment, fetchExamples } from "@/lib/api-client";
 import { LANGUAGES, type ForeignLanguageCode, type LanguageCode } from "@/lib/languages";
+import { readUserPreferences } from "@/lib/user-preferences";
 import { normalizeWord } from "@/lib/utils";
 import { wordTextSchema } from "@/lib/validation";
 import type { EnrichResponse } from "@/types/api";
@@ -75,7 +76,10 @@ export function AddWordDialog({
   const [phase, setPhase] = useState<"input" | "preview">("input");
   const [word, setWord] = useState(initialWord);
   const [inputLanguage, setInputLanguage] = useState<LanguageCode>(
-    dictionary.isNative ? "pl" : dictionary.sourceLanguage,
+    dictionary.isNative ||
+      readUserPreferences().defaultWordInputLanguage === "polish"
+      ? "pl"
+      : dictionary.sourceLanguage,
   );
   const [directionDialogOpen, setDirectionDialogOpen] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);

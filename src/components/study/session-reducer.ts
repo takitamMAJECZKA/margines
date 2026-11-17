@@ -16,7 +16,7 @@ export interface StudyState {
 export type StudyAction =
   | { type: "start"; words: Word[]; mode: "standard" | "daily" }
   | { type: "reveal" }
-  | { type: "answer"; known: boolean }
+  | { type: "answer"; known: boolean; knowledgeScore?: number }
   | { type: "reset" };
 
 export function shuffleWords(words: Word[]): Word[] {
@@ -66,6 +66,14 @@ export function studyReducer(
   const word = state.current;
   const attempts = state.attempts + 1;
   const misses = { ...state.misses };
+  const cards =
+    action.knowledgeScore === undefined
+      ? state.cards
+      : state.cards.map((card) =>
+          card.id === word.id
+            ? { ...card, knowledgeScore: action.knowledgeScore! }
+            : card,
+        );
 
   if (action.known) {
     const queue = state.queue.slice(1);
@@ -73,6 +81,7 @@ export function studyReducer(
 
     return {
       ...state,
+      cards,
       queue,
       current: queue[0] ?? null,
       revealed: false,
@@ -90,6 +99,7 @@ export function studyReducer(
     const queue = state.queue.slice(1);
     return {
       ...state,
+      cards,
       queue,
       current: queue[0] ?? null,
       revealed: false,

@@ -13,11 +13,12 @@ import {
   Layers,
   Play,
   RotateCcw,
+  Settings2,
   Sparkles,
 } from "lucide-react";
 
+import { KnowledgeStars } from "@/components/knowledge-stars";
 import { OfflineBadge } from "@/components/offline-badge";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -122,7 +123,9 @@ function StudyHeader() {
         </Button>
         <div className="flex items-center gap-1.5">
           <OfflineBadge />
-          <ThemeToggle />
+          <Button asChild variant="ghost" size="icon" aria-label="Ustawienia" title="Ustawienia" className="text-muted-foreground hover:text-foreground">
+            <Link href="/settings"><Settings2 aria-hidden="true" /></Link>
+          </Button>
         </div>
       </div>
     </header>
@@ -236,7 +239,18 @@ function StudyScreenContent({
     if (!session?.current) return;
 
     const { id } = session.current;
-    dispatch({ type: "answer", known });
+    const knowledgeScore = Math.max(
+      0,
+      Math.min(
+        5,
+        (session.current.knowledgeScore ?? 0) + (known ? 1 : -1),
+      ),
+    );
+    dispatch({
+      type: "answer",
+      known,
+      ...(session.mode === "daily" ? { knowledgeScore } : {}),
+    });
     void recordReview(id, known, mode === "daily").catch((error) => {
       console.error("Could not save review", error);
     });
@@ -566,10 +580,15 @@ function StudyScreenContent({
                   {LANGUAGES[selected.sourceLanguage].short} →{" "}
                   {LANGUAGES[selected.targetLanguage].short}
                 </Badge>
-                <span className="text-[11px] text-muted-foreground">
-                  {session.mode === "daily"
-                    ? `Wynik ${session.current.knowledgeScore ?? 0}/5 · pozostało ${session.queue.length}`
-                    : `Pozostało ${session.queue.length}`}
+                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  {session.mode === "daily" ? (
+                    <>
+                      <KnowledgeStars score={session.current.knowledgeScore ?? 0} />
+                      <span>· pozostało {session.queue.length}</span>
+                    </>
+                  ) : (
+                    `Pozostało ${session.queue.length}`
+                  )}
                 </span>
               </div>
 
@@ -742,7 +761,7 @@ function StudySummary({
         </p>
       </div>
 
-      <div className="mt-8 grid grid-cols-3 divide-x divide-border rounded-2xl border border-border bg-card py-4 shadow-card">
+      <div className={`mt-8 grid ${mode === "daily" ? "grid-cols-2" : "grid-cols-3"} divide-x divide-border rounded-2xl border border-border bg-card py-4 shadow-card`}>
         <div className="px-3 text-center">
           <p className="font-display text-2xl font-medium">{total}</p>
           <p className="mt-0.5 text-[10px] tracking-wide text-muted-foreground uppercase">
@@ -750,20 +769,46 @@ function StudySummary({
           </p>
         </div>
         <div className="px-3 text-center">
-          <p className="font-display text-2xl font-medium">{session.attempts}</p>
+          <p className="font-display text-2xl font-medium">
+            {mode === "daily" ? session.knownIds.length : session.attempts}
+          </p>
           <p className="mt-0.5 text-[10px] tracking-wide text-muted-foreground uppercase">
-            {pluralizePolish(session.attempts, "odpowiedź", "odpowiedzi", "odpowiedzi")}
+            {mode === "daily"
+              ? "poprawne"
+              : pluralizePolish(session.attempts, "odpowiedź", "odpowiedzi", "odpowiedzi")}
           </p>
         </div>
-        <div className="px-3 text-center">
-          <p className="font-display text-2xl font-medium">{firstTryPercent}%</p>
-          <p className="mt-0.5 text-[10px] tracking-wide text-muted-foreground uppercase">
-            za 1. razem
-          </p>
-        </div>
+        {mode === "standard" ? (
+          <div className="px-3 text-center">
+            <p className="font-display text-2xl font-medium">{firstTryPercent}%</p>
+            <p className="mt-0.5 text-[10px] tracking-wide text-muted-foreground uppercase">
+              za 1. razem
+            </p>
+          </div>
+        ) : null}
       </div>
 
-      {missedWords.length > 0 ? (
+      {mode === "daily" ? (
+        <div className="mt-6 rounded-2xl border border-border bg-card/60 p-5">
+          <h2 className="text-[10px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+            Poziom znajomości po powtórce
+          </h2>
+          <ul className="mt-3 divide-y divide-border/70">
+            {session.cards.map((word) => (
+              <li
+                key={word.id}
+                className="flex items-center justify-between gap-3 py-2.5 text-sm"
+              >
+                <span className="min-w-0">
+                  <span className="font-medium">{word.originalWord}</span>
+                  <span className="text-muted-foreground"> — {word.translation}</span>
+                </span>
+                <KnowledgeStars score={word.knowledgeScore ?? 0} className="shrink-0" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : missedWords.length > 0 ? (
         <div className="mt-6 rounded-2xl border border-border bg-card/60 p-5">
           <h2 className="text-[10px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
             Wymagały powtórki
@@ -787,9 +832,7 @@ function StudySummary({
         </div>
       ) : (
         <p className="mt-6 rounded-2xl border border-emerald-600/15 bg-emerald-600/[0.055] px-4 py-3.5 text-center text-sm text-emerald-800 dark:text-emerald-300">
-          {mode === "daily"
-            ? "Wszystkie odpowiedzi były poprawne. Świetnie!"
-            : "Wszystkie słowa znałeś od pierwszego razu. Świetnie!"}
+          Wszystkie słowa znałeś od pierwszego razu. Świetnie!
         </p>
       )}
 

@@ -1,6 +1,8 @@
 import { Brand } from "@/components/brand";
 import { OfflineBadge } from "@/components/offline-badge";
-import { ThemeToggle } from "@/components/theme-toggle";
+import Link from "next/link";
+import { Settings2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function AppHeader() {
   return (
@@ -9,7 +11,9 @@ export function AppHeader() {
         <Brand />
         <div className="flex items-center gap-1.5">
           <OfflineBadge />
-          <ThemeToggle />
+          <Button asChild variant="ghost" size="icon" aria-label="Ustawienia" title="Ustawienia" className="text-muted-foreground hover:text-foreground">
+            <Link href="/settings"><Settings2 aria-hidden="true" /></Link>
+          </Button>
         </div>
       </div>
     </header>

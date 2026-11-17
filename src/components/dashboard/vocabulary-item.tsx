@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { CalendarDays, Clock3, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { KnowledgeStars } from "@/components/knowledge-stars";
 import type { Word } from "@/db/types";
 import { cn, formatAddedDate } from "@/lib/utils";
 
@@ -190,21 +191,8 @@ export function VocabularyItem({
           <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground/85">
             <CalendarDays className="size-3" aria-hidden="true" />
             Dodano {formatAddedDate(word.createdAt)}
-            {word.reviewCount > 0 ? (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>
-                  {word.reviewCount}{" "}
-                  {word.reviewCount === 1
-                    ? "powtórka"
-                    : word.reviewCount < 5
-                      ? "powtórki"
-                      : "powtórek"}
-                </span>
-              </>
-            ) : null}
             <span aria-hidden="true">·</span>
-            <span>Znajomość {word.knowledgeScore}/5</span>
+            <KnowledgeStars score={word.knowledgeScore} />
             <span aria-hidden="true">·</span>
             <Clock3 className="size-3" aria-hidden="true" />
             <span>
