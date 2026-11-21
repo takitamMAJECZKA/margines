@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -33,9 +33,7 @@ import type {
   TranslationProviderName,
 } from "@/types/api";
 
-type ExampleSelection =
-  | { kind: "example"; id: string }
-  | { kind: "none" };
+type ExampleSelection = string | null;
 
 function providerLabel(provider: TranslationProviderName | null): string {
   if (provider === "deepl") return "DeepL";
@@ -48,11 +46,13 @@ function ExampleCard({
   active,
   sentence,
   translation,
+  source,
   onSelect,
 }: {
   active: boolean;
   sentence: string;
   translation: string;
+  source: "Tatoeba" | "AI";
   onSelect: () => void;
 }) {
   return (
@@ -69,7 +69,7 @@ function ExampleCard({
     >
       <div className="flex items-start justify-between gap-3">
         <span className="text-[10px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
-          Przykład
+          {source === "AI" ? "Przykład AI" : "Przykład"}
         </span>
         <span
           className={cn(
@@ -121,43 +121,27 @@ export function WordPreviewForm({
 }: WordPreviewFormProps) {
   const examples = enrichment.examples.slice(0, 1);
   const firstExample = examples[0];
-  const exampleIds = examples.map((example) => example.id).join("|");
   const [translation, setTranslation] = useState(enrichment.translation.text ?? "");
-  const [selection, setSelection] = useState<ExampleSelection>(
-    firstExample ? { kind: "example", id: firstExample.id } : { kind: "none" },
+  const [selectedId, setSelectedId] = useState<ExampleSelection>(
+    firstExample?.id ?? null,
   );
-  const choseNoneRef = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [manualTranslation, setManualTranslation] = useState(false);
 
-  // Examples arrive after the translation preview opens. Select the first one
-  // automatically, unless the user explicitly chose to save without one.
-  useEffect(() => {
-    if (!exampleIds) return;
-
-    const ids = exampleIds.split("|");
-    setSelection((current) => {
-      if (current.kind === "example" && ids.includes(current.id)) return current;
-      if (choseNoneRef.current) return current;
-      return { kind: "example", id: ids[0] };
-    });
-  }, [exampleIds]);
-
+  // Examples arrive after the translation preview opens. Falling back to the
+  // first one keeps the selection valid without an extra render cycle.
   const selectedExample: AuthenticExample | undefined =
-    selection.kind === "example"
-      ? examples.find((example) => example.id === selection.id)
-      : undefined;
+    examples.find((example) => example.id === selectedId) ?? examples[0];
+
+  // Native dictionaries are maintained by hand, so an example is optional
+  // there. For learned languages the flashcard always needs both sides.
+  const requiresExample = !dictionary.isNative;
+  const missingExample =
+    requiresExample && (!selectedExample || !selectedExample.translation.trim());
 
   function selectExample(example: AuthenticExample) {
-    choseNoneRef.current = false;
-    setSelection({ kind: "example", id: example.id });
-    setFormError(null);
-  }
-
-  function selectNone() {
-    choseNoneRef.current = true;
-    setSelection({ kind: "none" });
+    setSelectedId(example.id);
     setFormError(null);
   }
 
@@ -165,13 +149,28 @@ export function WordPreviewForm({
     event.preventDefault();
     if (saving) return;
 
+    if (missingExample) {
+      setFormError(
+        examplesLoading
+          ? "Czekam na przykładowe zdanie. Zapiszę je razem ze słowem."
+          : "Przykładowe zdanie z tłumaczeniem jest wymagane. Spróbuj ponownie.",
+      );
+      return;
+    }
+
+    const selectedSource = selectedExample?.source;
+
     const draft = {
       originalWord: enrichment.word,
       translation,
       exampleSentence: selectedExample?.text ?? "",
       exampleTranslation: selectedExample?.translation ?? "",
-      exampleType: selectedExample ? ("authentic" as const) : ("manual" as const),
-      exampleSource: selectedExample ? "Tatoeba" : "",
+      exampleType: selectedExample
+        ? selectedSource === "AI"
+          ? ("ai" as const)
+          : ("authentic" as const)
+        : ("manual" as const),
+      exampleSource: selectedSource ?? "",
       exampleSourceUrl: selectedExample?.sourceUrl ?? "",
       exampleAttribution: selectedExample?.attribution ?? "",
     };
@@ -237,8 +236,8 @@ export function WordPreviewForm({
         ) : null}
         <DialogTitle>Sprawdź i zapisz</DialogTitle>
         <DialogDescription>
-          Popraw tłumaczenie, wybierz jedno z przykładowych zdań albo zapisz
-          słowo w słowniku „{dictionary.name}”.
+          Popraw tłumaczenie i sprawdź przykładowe zdanie — zapiszemy je razem
+          ze słowem w słowniku „{dictionary.name}”.
         </DialogDescription>
       </DialogHeader>
 
@@ -345,22 +344,30 @@ export function WordPreviewForm({
         </div>
 
         <section className="grid gap-2.5" aria-labelledby="examples-heading">
-          <Label id="examples-heading">Przykład zdania</Label>
+          <Label id="examples-heading">
+            Przykład zdania{" "}
+            {requiresExample ? (
+              <span className="text-destructive" aria-hidden="true">
+                *
+              </span>
+            ) : null}
+          </Label>
 
           {examples.length > 0 ? (
             <>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Wybierz przykładowe zdanie. Treści przykładu nie można zmieniać.
+                {examples[0]?.source === "AI"
+                  ? "Tatoeba nie miała zdania z tym słowem, więc przygotowaliśmy krótkie zdanie AI wraz z tłumaczeniem."
+                  : "Zdanie z tłumaczeniem zostanie dołączone do fiszki."}
               </p>
               <div className="grid gap-2">
                 {examples.map((example) => (
                   <ExampleCard
                     key={example.id}
-                    active={
-                      selection.kind === "example" && selection.id === example.id
-                    }
+                    active={selectedExample?.id === example.id}
                     sentence={example.text}
                     translation={example.translation}
+                    source={example.source}
                     onSelect={() => selectExample(example)}
                   />
                 ))}
@@ -370,43 +377,49 @@ export function WordPreviewForm({
                   <Loader2 className="size-3.5 animate-spin" />
                   Szukam kolejnych przykładów…
                 </p>
+              ) : missingExample ? (
+                <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                  To zdanie nie ma jeszcze tłumaczenia. Zdanie z tłumaczeniem jest
+                  wymagane do zapisu.{" "}
+                  {!retrying ? (
+                    <button
+                      type="button"
+                      onClick={onRetryExamples}
+                      className="underline decoration-amber-700/30 underline-offset-2 hover:no-underline dark:decoration-amber-300/30"
+                    >
+                      Spróbuj ponownie
+                    </button>
+                  ) : null}
+                </p>
               ) : null}
             </>
           ) : examplesLoading ? (
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-border bg-muted/30 px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin text-primary" />
-              <span>Możesz zapisać teraz. Dodamy przykład automatycznie, gdy go znajdziemy.</span>
+              <span>Szukam zdania w Tatoeba. Jeśli go nie znajdę, wygeneruje je AI.</span>
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-muted/30 px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
-              {examplesError
-                ? `${examplesError.message} Możesz zapisać słowo bez przykładu.`
-                : "Brak przykładowego zdania. Możesz zapisać słowo bez przykładu."}
-              {examplesError && !retrying ? (
-                <button
-                  type="button"
-                  onClick={onRetryExamples}
-                  className="ml-1 underline decoration-border underline-offset-2 hover:text-foreground"
-                >
-                  Spróbuj ponownie
-                </button>
-              ) : null}
+              {requiresExample ? (
+                <>
+                  {examplesError
+                    ? `${examplesError.message} Zdanie jest wymagane, więc spróbuj ponownie.`
+                    : "Nie znaleziono zdania. Spróbuj ponownie — zdanie jest wymagane."}
+                  {!retrying ? (
+                    <button
+                      type="button"
+                      onClick={onRetryExamples}
+                      className="ml-1 underline decoration-border underline-offset-2 hover:text-foreground"
+                    >
+                      Spróbuj ponownie
+                    </button>
+                  ) : null}
+                </>
+              ) : (
+                "Brak przykładowego zdania. Możesz zapisać słowo bez przykładu."
+              )}
             </div>
           )}
-
-          {selection.kind !== "none" ? (
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={selectNone}
-                className="text-muted-foreground"
-              >
-                Bez przykładu
-              </Button>
-            </div>
-          ) : null}
         </section>
 
         {formError ? (
@@ -433,7 +446,12 @@ export function WordPreviewForm({
           </DialogClose>
           <Button
             type="submit"
-            disabled={saving || retrying}
+            disabled={saving || retrying || missingExample}
+            title={
+              missingExample
+                ? "Poczekaj na przykładowe zdanie z tłumaczeniem"
+                : undefined
+            }
           >
             {saving ? <Loader2 className="animate-spin" /> : <Save />}
             Zapisz słowo

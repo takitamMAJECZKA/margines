@@ -51,18 +51,18 @@ import { SwipeableCard } from "./swipeable-card";
 
 function translationSizeClass(text: string): string {
   const length = text.length;
-  if (length < 45) return "text-[clamp(2rem,9vw,3.5rem)]";
-  if (length < 105) return "text-[clamp(1.55rem,6.5vw,2.5rem)]";
-  if (length < 220) return "text-lg sm:text-xl";
-  return "text-base sm:text-lg";
+  if (length < 45) return "text-[clamp(1.9rem,8vw,3.25rem)]";
+  if (length < 105) return "text-[clamp(1.45rem,5.6vw,2.35rem)]";
+  if (length < 180) return "text-base sm:text-xl";
+  return "text-sm sm:text-lg";
 }
 
 function pairedPromptSizeClass(text: string): string {
   const length = text.length;
-  if (length < 50) return "text-[clamp(1.65rem,6.2vw,2.25rem)]";
-  if (length < 110) return "text-[clamp(1.4rem,5.2vw,1.9rem)]";
-  if (length < 200) return "text-[clamp(1.15rem,4.2vw,1.55rem)]";
-  return "text-base";
+  if (length < 50) return "text-[clamp(1.5rem,5.6vw,2.1rem)]";
+  if (length < 110) return "text-[clamp(1.25rem,4.6vw,1.75rem)]";
+  if (length < 170) return "text-[clamp(1.05rem,3.8vw,1.4rem)]";
+  return "text-sm sm:text-base";
 }
 
 function clozeSentence(word: Word, language: string): string | null {
@@ -488,13 +488,7 @@ function StudyScreenContent({
       : null;
 
   return (
-    <div
-      className={
-        isStudying
-          ? "flex h-dvh touch-none flex-col overflow-hidden overscroll-none"
-          : "flex min-h-dvh flex-col"
-      }
-    >
+    <div className="flex min-h-dvh flex-col">
       <StudyHeader />
 
       {!session ? (
@@ -634,7 +628,7 @@ function StudyScreenContent({
           onChangeScope={resetSession}
         />
       ) : (
-        <main className="mx-auto min-h-0 w-full max-w-xl flex-1 overflow-hidden px-4 pt-4 pb-4 sm:px-6 sm:pt-9 sm:pb-10">
+        <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-9 sm:pb-10">
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="truncate font-medium text-foreground">
               {scopedSet?.name ?? selected.name}
@@ -707,56 +701,56 @@ function StudyScreenContent({
                 <button
                   type="button"
                   onClick={() => dispatch({ type: "reveal" })}
-                  className="flex min-h-[21rem] w-full flex-col items-center justify-center px-6 py-10 text-center outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 sm:min-h-[25rem]"
+                  className="flex min-h-[20rem] w-full flex-col items-center justify-center px-5 py-7 text-center outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 sm:min-h-[25rem] sm:px-7 sm:py-10"
                 >
                   <span className="text-[10px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
                     {LANGUAGES[selected.targetLanguage].name}
                   </span>
                   {clozePrompt && session.current.exampleTranslation ? (
-                    <div className="mt-4 max-h-28 w-full max-w-full overflow-y-auto overscroll-contain px-2 py-1">
-                      <p className={`font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words text-foreground/85 ${pairedPromptSizeClass(session.current.exampleTranslation)}`}>
+                    <div className="mt-3 w-full max-w-full px-1 py-1 sm:px-2">
+                      <p className={`text-balance font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words text-foreground/85 ${pairedPromptSizeClass(session.current.exampleTranslation)}`}>
                         {session.current.exampleTranslation}
                       </p>
                     </div>
                   ) : null}
                   {clozePrompt ? (
-                    <div className="mt-5 max-h-64 w-full max-w-full overflow-y-auto overscroll-contain px-2 py-2">
+                    <div className="mt-4 w-full max-w-full px-1 py-2 sm:px-2">
                       <p className="mb-2 text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
                         {LANGUAGES[selected.sourceLanguage].name} · uzupełnij słowo
                       </p>
-                      <p className={`font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words ${pairedPromptSizeClass(clozePrompt)}`}>
+                      <p className={`text-balance font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words ${pairedPromptSizeClass(clozePrompt)}`}>
                         „{clozePrompt}”
                       </p>
                     </div>
                   ) : (
-                    <div className="mt-5 max-h-64 w-full max-w-full overflow-y-auto overscroll-contain px-2 py-2">
-                      <p className={`font-display leading-[1.25] font-medium tracking-[-0.03em] whitespace-pre-line break-words ${translationSizeClass(session.current.translation)}`}>
+                    <div className="mt-4 w-full max-w-full px-1 py-2 sm:px-2">
+                      <p className={`text-balance font-display leading-[1.25] font-medium tracking-[-0.03em] whitespace-pre-line break-words ${translationSizeClass(session.current.translation)}`}>
                         {session.current.translation}
                       </p>
                     </div>
                   )}
                   {clozePrompt ? (
-                    <div className="mt-3 max-h-36 max-w-full overflow-y-auto px-2 py-2">
+                    <div className="mt-2 w-full max-w-full px-1 py-1 sm:px-2">
                       <p className="text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
                         Po polsku
                       </p>
-                      <p className={`mt-1 font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words text-foreground/85 ${pairedPromptSizeClass(clozePrompt)}`}>
+                      <p className={`mt-1 text-balance font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words text-foreground/85 ${pairedPromptSizeClass(clozePrompt)}`}>
                         {session.current.translation}
                       </p>
                     </div>
                   ) : null}
-                  <span className="mt-8 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="mt-6 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Eye className="size-3.5" aria-hidden="true" />
                     Dotknij, aby odsłonić · przesuń, aby ocenić
                   </span>
                 </button>
               ) : (
-                <div className="flex min-h-[21rem] flex-col items-center justify-center px-6 py-10 text-center duration-200 animate-in fade-in-0 slide-in-from-bottom-1 sm:min-h-[25rem]">
+                <div className="flex min-h-[20rem] flex-col items-center justify-center px-5 py-7 text-center duration-200 animate-in fade-in-0 slide-in-from-bottom-1 sm:min-h-[25rem] sm:px-7 sm:py-10">
                   <span className="text-[10px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
                     {LANGUAGES[selected.sourceLanguage].name}
                   </span>
-                  <div className="mt-4 flex max-w-full items-center justify-center gap-1.5">
-                    <p className={`max-h-44 min-w-0 max-w-full overflow-y-auto py-2 font-display leading-[1.25] font-medium tracking-[-0.03em] whitespace-pre-line break-words ${pairedPromptSizeClass(session.current.exampleSentence || session.current.originalWord)}`}>
+                  <div className="mt-3 flex max-w-full min-w-0 items-center justify-center gap-2">
+                    <p className={`min-w-0 max-w-full text-balance py-1 font-display leading-[1.25] font-medium tracking-[-0.03em] whitespace-pre-line break-words ${pairedPromptSizeClass(session.current.exampleSentence || session.current.originalWord)}`}>
                       {session.current.originalWord}
                     </p>
                     {speechSupported ? (
@@ -788,17 +782,17 @@ function StudyScreenContent({
                     ) : null}
                   </div>
                   <div className="my-3 h-px w-14 bg-border" />
-                  <p className="max-h-24 overflow-y-auto whitespace-pre-line text-sm text-muted-foreground">
+                  <p className="text-balance whitespace-pre-line text-sm text-muted-foreground">
                     {session.current.translation}
                   </p>
 
                   {session.current.exampleSentence ? (
-                    <blockquote className="mx-auto mt-4 max-h-52 max-w-md overflow-y-auto border-t border-border/70 px-2 py-3">
-                      <p className={`font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words text-foreground/85 ${pairedPromptSizeClass(session.current.exampleSentence)}`}>
+                    <blockquote className="mx-auto mt-4 w-full max-w-md border-t border-border/70 px-1 py-3 sm:px-2">
+                      <p className={`text-balance font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words text-foreground/85 ${pairedPromptSizeClass(session.current.exampleSentence)}`}>
                         „{session.current.exampleSentence}”
                       </p>
                       {session.current.exampleTranslation ? (
-                        <p className="mt-2 border-t border-border/50 pt-2 text-base leading-relaxed text-foreground/80 sm:text-lg">
+                        <p className="mt-2 border-t border-border/50 pt-2 text-sm leading-relaxed text-foreground/80 sm:text-base">
                           <span className="font-medium text-muted-foreground/80">
                             Po polsku: {" "}
                           </span>

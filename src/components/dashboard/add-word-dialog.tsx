@@ -303,7 +303,10 @@ export function AddWordDialog({
       setCurrentEnrichment(response);
       setPhase("preview");
 
-      if (response.examples.length === 0) {
+      const hasUsableExample = response.examples.some(
+        (example) => example.text.trim() && example.translation.trim(),
+      );
+      if (!hasUsableExample) {
         void loadExamples(response.baseWord ?? response.word, key);
       }
     } catch (error) {

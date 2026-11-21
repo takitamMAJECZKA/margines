@@ -8,7 +8,7 @@ import type {
 } from "@/types/api";
 
 const CLIENT_TIMEOUT_MS = 35_000;
-const EXAMPLES_TIMEOUT_MS = 40_000;
+const EXAMPLES_TIMEOUT_MS = 60_000;
 // Article lookup is a single MediaWiki request and runs alongside translation.
 // A shorter timeout keeps the add-word preview responsive when Wiktionary is
 // slow; the word is still saved without an article.

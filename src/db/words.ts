@@ -177,10 +177,10 @@ export async function attachExampleIfEmpty(
     await db.words.update(id, {
       exampleSentence: example.text,
       exampleTranslation: example.translation,
-      exampleSource: "Tatoeba",
+      exampleSource: example.source,
       exampleSourceUrl: example.sourceUrl,
       exampleAttribution: example.attribution,
-      exampleType: "authentic",
+      exampleType: example.source === "AI" ? "ai" : "authentic",
       updatedAt: Date.now(),
     });
   });

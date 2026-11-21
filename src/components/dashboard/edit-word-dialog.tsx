@@ -89,7 +89,7 @@ export function EditWordDialog({
       );
       if (!next) {
         setExampleError(
-          result.examplesError?.message ?? "Nie znaleziono innego przykładu w Tatoeba.",
+          result.examplesError?.message ?? "Nie znaleziono innego przykładowego zdania.",
         );
         return;
       }
@@ -99,7 +99,7 @@ export function EditWordDialog({
       setExampleError(
         cause instanceof ApiClientError
           ? cause.message
-          : "Nie udało się pobrać zdania z Tatoeba.",
+          : "Nie udało się pobrać przykładowego zdania.",
       );
     } finally {
       setSearchingExample(false);
@@ -123,8 +123,14 @@ export function EditWordDialog({
       translation,
       exampleSentence: alternativeExample?.text ?? word.exampleSentence,
       exampleTranslation: alternativeExample?.translation ?? word.exampleTranslation,
-      exampleType: alternativeExample ? "authentic" : word.exampleType,
-      exampleSource: alternativeExample ? "Tatoeba" : word.exampleSource,
+      exampleType: alternativeExample
+        ? alternativeExample.source === "AI"
+          ? "ai"
+          : "authentic"
+        : word.exampleType,
+      exampleSource: alternativeExample
+        ? alternativeExample.source
+        : word.exampleSource,
       exampleSourceUrl: alternativeExample?.sourceUrl ?? word.exampleSourceUrl,
       exampleAttribution: alternativeExample?.attribution ?? word.exampleAttribution,
     };
@@ -160,7 +166,8 @@ export function EditWordDialog({
         <DialogHeader>
           <DialogTitle>Edytuj słowo</DialogTitle>
           <DialogDescription>
-            Popraw słowo i tłumaczenie. Przykład możesz zmienić, wybierając inne zdanie z Tatoeba.
+            Popraw słowo i tłumaczenie. Przykład możesz zmienić, wybierając inne
+            zdanie z Tatoeba lub wygenerowane przez AI.
           </DialogDescription>
         </DialogHeader>
 
@@ -208,7 +215,11 @@ export function EditWordDialog({
                   </p>
                 ) : null}
                 {alternativeExample ? (
-                  <p className="mt-1 text-[10px] font-medium text-primary">Nowe zdanie z Tatoeba</p>
+                  <p className="mt-1 text-[10px] font-medium text-primary">
+                    {alternativeExample.source === "AI"
+                      ? "Nowe zdanie wygenerowane przez AI"
+                      : "Nowe zdanie z Tatoeba"}
+                  </p>
                 ) : null}
               </blockquote>
             ) : (
@@ -224,8 +235,8 @@ export function EditWordDialog({
               >
                 {searchingExample ? <Loader2 className="animate-spin" /> : <RefreshCw />}
                 {word?.exampleSentence || alternativeExample
-                  ? "Szukaj innego zdania z Tatoeba"
-                  : "Szukaj zdania w Tatoeba"}
+                  ? "Szukaj innego zdania"
+                  : "Szukaj zdania"}
               </Button>
             ) : null}
             {exampleError ? (

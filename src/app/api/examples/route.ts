@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { issueFromError } from "@/lib/server/errors";
-import { findAuthenticExamples } from "@/lib/tatoeba/client";
+import { findExamples } from "@/lib/examples";
 import { examplesRequestSchema, firstZodError } from "@/lib/validation";
 import type { ExamplesResponse } from "@/types/api";
 
 /**
  * Example sentences live in their own endpoint so a slow Tatoeba response
- * never blocks the translation shown in the add-word dialog.
+ * never blocks the translation shown in the add-word dialog. Tatoeba hits get
+ * a DeepL translation when needed; when the corpus is empty, the endpoint
+ * returns a labelled Gemma-generated sentence instead.
  */
 export async function POST(request: Request) {
   let body: unknown;
@@ -28,7 +30,7 @@ export async function POST(request: Request) {
   let payload: ExamplesResponse;
 
   try {
-    const result = await findAuthenticExamples(word, sourceLanguage, excludeIds);
+    const result = await findExamples(word, sourceLanguage, excludeIds);
     payload = {
       examples: result.examples,
       examplesError: result.error,

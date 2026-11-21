@@ -23,11 +23,15 @@ export interface TranslationResult {
   error: ApiIssue | null;
 }
 
+/**
+ * An example sentence attached to a word. Most come from Tatoeba; when the
+ * corpus has nothing usable, a labelled AI sentence is used instead.
+ */
 export interface AuthenticExample {
   id: string;
   text: string;
   translation: string;
-  source: "Tatoeba";
+  source: "Tatoeba" | "AI";
   sourceUrl: string;
   attribution: string;
   license: string;
