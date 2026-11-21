@@ -3,6 +3,7 @@ import { normalizeWord } from "@/lib/utils";
 
 import { DuplicateWordError, ValidationError } from "./errors";
 import { db } from "./index";
+import { deleteCloudRecord, syncWord } from "./cloud-sync";
 import { replaceWordSets } from "./sets";
 import type { Word } from "./types";
 import type { AuthenticExample } from "@/types/api";
@@ -123,6 +124,7 @@ export async function createWord(
     throw error;
   }
 
+  await syncWord(word.id);
   return word;
 }
 
@@ -159,6 +161,7 @@ export async function updateWord(
     throw error;
   }
 
+  await syncWord(updated.id);
   return updated;
 }
 
@@ -181,9 +184,11 @@ export async function attachExampleIfEmpty(
       updatedAt: Date.now(),
     });
   });
+  await syncWord(id);
 }
 
 export async function deleteWord(id: string): Promise<void> {
+  await deleteCloudRecord("words", id);
   await db.transaction("rw", db.words, db.setWords, async () => {
     await db.setWords.where("wordId").equals(id).delete();
     await db.words.delete(id);
@@ -225,33 +230,70 @@ export async function restoreWord(
     }
     throw error;
   }
+  await syncWord(word.id);
 }
 
+/** Review metadata needed to restore a word after an accidental swipe. */
+export interface WordProgress {
+  reviewCount: number;
+  lastReviewedAt: number | null;
+  lastReviewKnown: boolean | null;
+  knowledgeScore: number;
+}
+
+function readProgress(word: Word): WordProgress {
+  return {
+    reviewCount: word.reviewCount ?? 0,
+    lastReviewedAt: word.lastReviewedAt ?? null,
+    lastReviewKnown: word.lastReviewKnown ?? null,
+    knowledgeScore: word.knowledgeScore ?? 0,
+  };
+}
+
+/**
+ * Saves an answer and returns the progress values from just before it, so an
+ * undone swipe can put the word back exactly where it was.
+ */
 export async function recordReview(
   id: string,
   known: boolean,
   updateKnowledgeScore = false,
-): Promise<void> {
+): Promise<WordProgress | null> {
   const word = await db.words.get(id);
-  if (!word) return;
+  if (!word) return null;
+
+  const previous = readProgress(word);
 
   await db.words.update(id, {
-    reviewCount: (word.reviewCount ?? 0) + 1,
+    reviewCount: previous.reviewCount + 1,
     lastReviewedAt: Date.now(),
     lastReviewKnown: known,
     ...(updateKnowledgeScore
       ? {
           knowledgeScore: Math.max(
             0,
-            Math.min(5, (word.knowledgeScore ?? 0) + (known ? 1 : -1)),
+            Math.min(5, previous.knowledgeScore + (known ? 1 : -1)),
           ),
         }
       : {}),
     updatedAt: Date.now(),
   });
+  await syncWord(id);
+
+  return previous;
+}
+
+/** Reverts a review saved by {@link recordReview}. */
+export async function restoreWordProgress(
+  id: string,
+  progress: WordProgress,
+): Promise<void> {
+  await db.words.update(id, { ...progress, updatedAt: Date.now() });
+  await syncWord(id);
 }
 
 export async function markWordAppeared(id: string): Promise<void> {
   const now = Date.now();
   await db.words.update(id, { lastAppearedAt: now, updatedAt: now });
+  await syncWord(id);
 }

@@ -164,6 +164,12 @@ export const articleRequestSchema = z.object({
   sourceLanguage: foreignLanguageCodeSchema,
 });
 
+/** One chunk of text for the online pronunciation fallback. */
+export const speechRequestSchema = z.object({
+  text: z.string().trim().min(1).max(200),
+  language: languageCodeSchema,
+});
+
 export type ArticleRequest = z.infer<typeof articleRequestSchema>;
 
 export function firstZodError(error: z.ZodError): string {

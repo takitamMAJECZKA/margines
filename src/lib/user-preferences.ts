@@ -44,6 +44,19 @@ export function saveUserPreferences(
   update: Partial<UserPreferences>,
 ): UserPreferences {
   const preferences = { ...readUserPreferences(), ...update };
+  replaceUserPreferences(preferences);
+  void import("@/db/cloud-sync")
+    .then(({ syncPreferences }) => syncPreferences(preferences))
+    .catch((error: unknown) => {
+      console.error("Could not sync user preferences to Supabase", error);
+    });
+  return preferences;
+}
+
+/** Replaces the browser cache after loading the signed-in user's cloud settings. */
+export function replaceUserPreferences(
+  preferences: UserPreferences,
+): UserPreferences {
   try {
     window.localStorage.setItem(USER_PREFERENCES_KEY, JSON.stringify(preferences));
     window.dispatchEvent(new Event(USER_PREFERENCES_EVENT));

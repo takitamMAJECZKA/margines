@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -15,6 +15,8 @@ import {
   RotateCcw,
   Settings2,
   Sparkles,
+  Undo2,
+  Volume2,
 } from "lucide-react";
 
 import { KnowledgeStars } from "@/components/knowledge-stars";
@@ -27,9 +29,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { listDictionaries } from "@/db/dictionaries";
 import { listSets, listWordsForSet } from "@/db/sets";
 import type { Word, WordSet } from "@/db/types";
-import { markWordAppeared, recordReview, listWords } from "@/db/words";
+import {
+  markWordAppeared,
+  recordReview,
+  restoreWordProgress,
+  listWords,
+  type WordProgress,
+} from "@/db/words";
 import { useDatabaseReady } from "@/hooks/use-database-ready";
 import { useDictionarySelection } from "@/hooks/use-dictionary-selection";
+import { useSpeech } from "@/hooks/use-speech";
 import {
   DICTIONARY_COLOR_HEX,
   LANGUAGES,
@@ -224,21 +233,51 @@ function StudyScreenContent({
 
   const [session, dispatch] = useReducer(studyReducer, null);
   const isStudying = Boolean(session && !session.finished);
+  const {
+    supported: speechSupported,
+    speakingKey,
+    speak,
+    stop: stopSpeech,
+  } = useSpeech();
+
+  /**
+   * Review writes and their undos share one queue so a quick undo can never
+   * overtake the answer it is meant to revert.
+   */
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const previousProgressRef = useRef<Array<WordProgress | null>>([]);
+
+  function enqueueWrite(task: () => Promise<unknown>) {
+    writeQueueRef.current = writeQueueRef.current
+      .then(async () => {
+        await task();
+      })
+      .catch((error: unknown) => {
+        console.error("Could not save study progress", error);
+      });
+  }
 
   function startSession() {
     if (studyWords.length === 0) return;
+    previousProgressRef.current = [];
     dispatch({ type: "start", words: studyWords, mode });
+  }
+
+  function resetSession() {
+    previousProgressRef.current = [];
+    dispatch({ type: "reset" });
   }
 
   function changeScope(id: string) {
     setScopeId(id || null);
-    dispatch({ type: "reset" });
+    resetSession();
   }
 
   function answer(known: boolean) {
     if (!session?.current) return;
 
     const { id } = session.current;
+    const isDaily = session.mode === "daily";
     const knowledgeScore = Math.max(
       0,
       Math.min(
@@ -246,13 +285,41 @@ function StudyScreenContent({
         (session.current.knowledgeScore ?? 0) + (known ? 1 : -1),
       ),
     );
+    const answerIndex = session.history.length;
+
     dispatch({
       type: "answer",
       known,
-      ...(session.mode === "daily" ? { knowledgeScore } : {}),
+      ...(isDaily ? { knowledgeScore } : {}),
     });
-    void recordReview(id, known, mode === "daily").catch((error) => {
-      console.error("Could not save review", error);
+    enqueueWrite(async () => {
+      previousProgressRef.current[answerIndex] = await recordReview(
+        id,
+        known,
+        isDaily,
+      );
+    });
+  }
+
+  /**
+   * Takes back the last swipe: the card returns as the current one and the
+   * word's review counters (and daily knowledge score) go back to their values
+   * from before the answer.
+   */
+  function undoLastAnswer() {
+    if (!session) return;
+
+    const entryIndex = session.history.length - 1;
+    const entry = session.history[entryIndex];
+    if (!entry) return;
+
+    dispatch({ type: "undo" });
+    enqueueWrite(async () => {
+      const previous = previousProgressRef.current[entryIndex];
+      if (!previous) return;
+
+      await restoreWordProgress(entry.answer.wordId, previous);
+      previousProgressRef.current.length = entryIndex;
     });
   }
 
@@ -265,6 +332,10 @@ function StudyScreenContent({
       console.error("Could not save flashcard appearance", error);
     });
   }, [currentWordId, sessionAttempts]);
+
+  useEffect(() => {
+    stopSpeech();
+  }, [currentWordId, stopSpeech]);
 
   useEffect(() => {
     if (!isStudying) return;
@@ -310,7 +381,7 @@ function StudyScreenContent({
   }, [isStudying]);
 
   useEffect(() => {
-    if (!session || session.finished) return;
+    if (!session) return;
 
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
@@ -320,6 +391,17 @@ function StudyScreenContent({
       ) {
         return;
       }
+
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === "z"
+      ) {
+        event.preventDefault();
+        undoLastAnswer();
+        return;
+      }
+
+      if (session?.finished) return;
 
       if (!session?.revealed && (event.code === "Space" || event.key === "Enter")) {
         event.preventDefault();
@@ -340,7 +422,8 @@ function StudyScreenContent({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-    // answer is derived from the current session; the listener is re-bound on each state change.
+    // answer and undoLastAnswer are derived from the current session; the
+    // listener is re-bound on each state change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
@@ -524,6 +607,17 @@ function StudyScreenContent({
               </kbd>
               ocenia
             </span>
+            <span className="hidden h-3 w-px bg-border sm:block" />
+            <span className="hidden items-center gap-1 sm:flex">
+              <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-sans text-[10px]">
+                Ctrl
+              </kbd>
+              +
+              <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px]">
+                Z
+              </kbd>
+              cofa
+            </span>
             <Link href="/" className="underline decoration-border underline-offset-4 hover:text-foreground">
               Wróć do słownika
             </Link>
@@ -535,8 +629,9 @@ function StudyScreenContent({
           mode={session.mode}
           contextName={scopedSet?.name ?? selected.name}
           onRestart={startSession}
+          onUndo={undoLastAnswer}
           canRestart={mode !== "daily" || studyWords.length > 0}
-          onChangeScope={() => dispatch({ type: "reset" })}
+          onChangeScope={resetSession}
         />
       ) : (
         <main className="mx-auto min-h-0 w-full max-w-xl flex-1 overflow-hidden px-4 pt-4 pb-4 sm:px-6 sm:pt-9 sm:pb-10">
@@ -544,11 +639,27 @@ function StudyScreenContent({
             <span className="truncate font-medium text-foreground">
               {scopedSet?.name ?? selected.name}
             </span>
-            <span className="tabular-nums text-muted-foreground">
-              {session.mode === "daily"
-                ? `${completedCount} / ${total} powtórzone`
-                : `${knownCount} / ${total} opanowane`}
-            </span>
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="tabular-nums text-muted-foreground">
+                {session.mode === "daily"
+                  ? `${completedCount} / ${total} powtórzone`
+                  : `${knownCount} / ${total} opanowane`}
+              </span>
+              {session.history.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={undoLastAnswer}
+                  aria-label="Cofnij ostatnią fiszkę"
+                  aria-keyshortcuts="Control+Z"
+                  title="Cofnij ostatnią fiszkę (Ctrl+Z)"
+                  className="size-8 rounded-full text-muted-foreground hover:text-foreground"
+                >
+                  <Undo2 />
+                </Button>
+              ) : null}
+            </div>
           </div>
 
           <div
@@ -601,6 +712,13 @@ function StudyScreenContent({
                   <span className="text-[10px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
                     {LANGUAGES[selected.targetLanguage].name}
                   </span>
+                  {clozePrompt && session.current.exampleTranslation ? (
+                    <div className="mt-4 max-h-28 w-full max-w-full overflow-y-auto overscroll-contain px-2 py-1">
+                      <p className={`font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words text-foreground/85 ${pairedPromptSizeClass(session.current.exampleTranslation)}`}>
+                        {session.current.exampleTranslation}
+                      </p>
+                    </div>
+                  ) : null}
                   {clozePrompt ? (
                     <div className="mt-5 max-h-64 w-full max-w-full overflow-y-auto overscroll-contain px-2 py-2">
                       <p className="mb-2 text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
@@ -637,9 +755,38 @@ function StudyScreenContent({
                   <span className="text-[10px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
                     {LANGUAGES[selected.sourceLanguage].name}
                   </span>
-                  <p className={`mt-4 max-h-44 max-w-full overflow-y-auto py-2 font-display leading-[1.25] font-medium tracking-[-0.03em] whitespace-pre-line break-words ${pairedPromptSizeClass(session.current.exampleSentence || session.current.originalWord)}`}>
-                    {session.current.originalWord}
-                  </p>
+                  <div className="mt-4 flex max-w-full items-center justify-center gap-1.5">
+                    <p className={`max-h-44 min-w-0 max-w-full overflow-y-auto py-2 font-display leading-[1.25] font-medium tracking-[-0.03em] whitespace-pre-line break-words ${pairedPromptSizeClass(session.current.exampleSentence || session.current.originalWord)}`}>
+                      {session.current.originalWord}
+                    </p>
+                    {speechSupported ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        data-swipe-ignore
+                        onClick={() => {
+                          if (!session.current) return;
+                          speak(
+                            session.current.originalWord,
+                            selected.sourceLanguage,
+                            `${session.current.id}:word`,
+                          );
+                        }}
+                        aria-label="Przeczytaj słowo na głos"
+                        title="Przeczytaj słowo na głos"
+                        className="size-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+                      >
+                        <Volume2
+                          className={
+                            speakingKey === `${session.current.id}:word`
+                              ? "animate-pulse"
+                              : undefined
+                          }
+                        />
+                      </Button>
+                    ) : null}
+                  </div>
                   <div className="my-3 h-px w-14 bg-border" />
                   <p className="max-h-24 overflow-y-auto whitespace-pre-line text-sm text-muted-foreground">
                     {session.current.translation}
@@ -651,12 +798,42 @@ function StudyScreenContent({
                         „{session.current.exampleSentence}”
                       </p>
                       {session.current.exampleTranslation ? (
-                        <p className="mt-2 border-t border-border/50 pt-2 text-xs leading-relaxed text-muted-foreground">
+                        <p className="mt-2 border-t border-border/50 pt-2 text-base leading-relaxed text-foreground/80 sm:text-lg">
                           <span className="font-medium text-muted-foreground/80">
                             Po polsku: {" "}
                           </span>
                           {session.current.exampleTranslation}
                         </p>
+                      ) : null}
+                      {speechSupported ? (
+                        <div className="mt-2 flex justify-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            data-swipe-ignore
+                            onClick={() => {
+                              if (!session.current) return;
+                              speak(
+                                session.current.exampleSentence,
+                                selected.sourceLanguage,
+                                `${session.current.id}:sentence`,
+                              );
+                            }}
+                            aria-label="Przeczytaj zdanie na głos"
+                            title="Przeczytaj zdanie na głos"
+                            className="h-8 rounded-full px-3 text-[11px] text-muted-foreground hover:text-foreground"
+                          >
+                            <Volume2
+                              className={
+                                speakingKey === `${session.current.id}:sentence`
+                                  ? "animate-pulse"
+                                  : undefined
+                              }
+                            />
+                            Posłuchaj zdania
+                          </Button>
+                        </div>
                       ) : null}
                     </blockquote>
                   ) : null}
@@ -725,6 +902,7 @@ function StudySummary({
   mode,
   contextName,
   onRestart,
+  onUndo,
   canRestart,
   onChangeScope,
 }: {
@@ -732,6 +910,7 @@ function StudySummary({
   mode: "standard" | "daily";
   contextName: string;
   onRestart: () => void;
+  onUndo: () => void;
   canRestart: boolean;
   onChangeScope: () => void;
 }) {
@@ -845,6 +1024,19 @@ function StudySummary({
           Zmień zakres
         </Button>
       </div>
+
+      {session.history.length > 0 ? (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onUndo}
+          aria-keyshortcuts="Control+Z"
+          className="mt-2.5 w-full text-muted-foreground"
+        >
+          <Undo2 />
+          Cofnij ostatnią fiszkę
+        </Button>
+      ) : null}
 
       <div className="mt-5 text-center">
         <Link

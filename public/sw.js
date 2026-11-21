@@ -8,7 +8,7 @@
  * - Hashed Next.js assets are cached forever, runtime responses briefly.
  */
 
-const VERSION = "margines-v1";
+const VERSION = "margines-v3";
 const SHELL_CACHE = `${VERSION}-shell`;
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
@@ -185,6 +185,14 @@ self.addEventListener("fetch", (event) => {
 
   // Online-only APIs; translations and examples must never be served stale.
   if (url.pathname.startsWith("/api/")) return;
+
+  // Next.js RSC and prefetch payloads are tied to a particular render/build.
+  // Returning a stale payload can make the server HTML disagree with the client.
+  if (
+    request.headers.has("RSC") ||
+    request.headers.has("Next-Router-Prefetch") ||
+    url.searchParams.has("_rsc")
+  ) return;
 
   // The service worker and its asset manifest must always be revalidated.
   if (url.pathname === "/sw.js" || url.pathname === "/sw-manifest.json") return;

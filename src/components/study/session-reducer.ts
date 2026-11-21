@@ -1,6 +1,6 @@
 import type { Word } from "@/db/types";
 
-export interface StudyState {
+export interface StudySnapshot {
   mode: "standard" | "daily";
   cards: Word[];
   queue: Word[];
@@ -13,10 +13,27 @@ export interface StudyState {
   finished: boolean;
 }
 
+export interface StudyAnswer {
+  wordId: string;
+  known: boolean;
+}
+
+export interface StudyHistoryEntry {
+  /** Session state from before the answer, restored by an undo. */
+  state: StudySnapshot;
+  answer: StudyAnswer;
+}
+
+export interface StudyState extends StudySnapshot {
+  /** Answered cards, newest last. Undo walks this stack backwards. */
+  history: StudyHistoryEntry[];
+}
+
 export type StudyAction =
   | { type: "start"; words: Word[]; mode: "standard" | "daily" }
   | { type: "reveal" }
   | { type: "answer"; known: boolean; knowledgeScore?: number }
+  | { type: "undo" }
   | { type: "reset" };
 
 export function shuffleWords(words: Word[]): Word[] {
@@ -28,6 +45,34 @@ export function shuffleWords(words: Word[]): Word[] {
   }
 
   return shuffled;
+}
+
+function snapshot(state: StudySnapshot): StudySnapshot {
+  const {
+    mode,
+    cards,
+    queue,
+    current,
+    revealed,
+    knownIds,
+    firstTryKnownIds,
+    attempts,
+    misses,
+    finished,
+  } = state;
+
+  return {
+    mode,
+    cards,
+    queue,
+    current,
+    revealed,
+    knownIds,
+    firstTryKnownIds,
+    attempts,
+    misses,
+    finished,
+  };
 }
 
 export function createStudyState(
@@ -47,6 +92,7 @@ export function createStudyState(
     attempts: 0,
     misses: {},
     finished: shuffled.length === 0,
+    history: [],
   };
 }
 
@@ -57,7 +103,16 @@ export function studyReducer(
   if (action.type === "reset") return null;
   if (action.type === "start") return createStudyState(action.words, action.mode);
 
-  if (!state || state.finished || !state.current) return state;
+  if (!state) return state;
+
+  if (action.type === "undo") {
+    const last = state.history.at(-1);
+    if (!last) return state;
+
+    return { ...last.state, history: state.history.slice(0, -1) };
+  }
+
+  if (state.finished || !state.current) return state;
 
   if (action.type === "reveal") {
     return { ...state, revealed: true };
@@ -74,6 +129,10 @@ export function studyReducer(
             ? { ...card, knowledgeScore: action.knowledgeScore! }
             : card,
         );
+  const history = [
+    ...state.history,
+    { state: snapshot(state), answer: { wordId: word.id, known: action.known } },
+  ];
 
   if (action.known) {
     const queue = state.queue.slice(1);
@@ -91,6 +150,7 @@ export function studyReducer(
         ? state.firstTryKnownIds
         : [...state.firstTryKnownIds, word.id],
       finished: queue.length === 0,
+      history,
     };
   }
 
@@ -106,6 +166,7 @@ export function studyReducer(
       attempts,
       misses,
       finished: queue.length === 0,
+      history,
     };
   }
 
@@ -119,5 +180,6 @@ export function studyReducer(
     attempts,
     misses,
     finished: false,
+    history,
   };
 }

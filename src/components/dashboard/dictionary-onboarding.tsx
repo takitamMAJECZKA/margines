@@ -257,8 +257,8 @@ export function DictionaryOnboarding({
       </div>
 
       <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground/80">
-        Wszystkie słowa zapisują się wyłącznie na tym urządzeniu. Do tłumaczeń,
-        przykładów i rodzajników aplikacja używa internetu.
+          Słowniki, słowa i postęp zapisują się na Twoim koncie i synchronizują
+          między urządzeniami.
       </p>
     </main>
   );

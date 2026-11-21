@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore, useState } from "react";
+import { useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useTheme } from "next-themes";
@@ -9,10 +9,12 @@ import { toast } from "sonner";
 
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { listDictionaries, reorderDictionaries } from "@/db/dictionaries";
 import type { Dictionary } from "@/db/types";
 import { useDatabaseReady } from "@/hooks/use-database-ready";
 import { LANGUAGES } from "@/lib/languages";
+import { createClient } from "@/lib/supabase/client";
 import {
   readDefaultWordInputLanguage,
   saveUserPreferences,
@@ -31,6 +33,27 @@ export function SettingsScreen() {
     () => "dictionary" as DefaultWordInputLanguage,
   );
   const [reordering, setReordering] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!cancelled) setUsername(data?.username ?? null);
+    })().catch((error: unknown) => {
+      console.error("Nie udało się pobrać nazwy użytkownika", error);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   async function moveDictionary(index: number, direction: -1 | 1) {
     if (!dictionaries || reordering) return;
@@ -59,6 +82,50 @@ export function SettingsScreen() {
     saveUserPreferences({ theme: value });
   }
 
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (passwordBusy) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const currentPassword = String(form.get("currentPassword") ?? "");
+    const newPassword = String(form.get("newPassword") ?? "");
+    const confirmation = String(form.get("confirmPassword") ?? "");
+    setPasswordMessage("");
+
+    if (newPassword.length < 8) {
+      setPasswordMessage("Nowe hasło musi mieć co najmniej 8 znaków.");
+      return;
+    }
+    if (newPassword !== confirmation) {
+      setPasswordMessage("Nowe hasła nie są takie same.");
+      return;
+    }
+
+    setPasswordBusy(true);
+    try {
+      const { error } = await createClient().auth.updateUser({
+        current_password: currentPassword,
+        password: newPassword,
+      });
+      if (error) {
+        const message = error.message.toLowerCase();
+        if (message.includes("current password") || message.includes("invalid login credentials")) {
+          throw new Error("Obecne hasło jest nieprawidłowe.");
+        }
+        if (message.includes("password") && message.includes("weak")) {
+          throw new Error("Nowe hasło jest zbyt słabe. Wybierz inne.");
+        }
+        throw new Error("Nie udało się zmienić hasła. Sprawdź obecne hasło i spróbuj ponownie.");
+      }
+      formElement.reset();
+      setPasswordMessage("Hasło zostało zmienione.");
+    } catch (error) {
+      setPasswordMessage(error instanceof Error ? error.message : "Nie udało się zmienić hasła.");
+    } finally {
+      setPasswordBusy(false);
+    }
+  }
+
   return (
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
@@ -76,11 +143,44 @@ export function SettingsScreen() {
           Ustawienia
         </h1>
         <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
-          Dostosuj wygląd i sposób dodawania słów. Ustawienia są przygotowane
-          tak, by później można je było synchronizować z kontem.
+          Dostosuj wygląd i sposób dodawania słów. Twoje słowniki i postęp
+          synchronizują się z kontem.
         </p>
 
         <div className="mt-8 grid gap-4">
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-card sm:p-5">
+            <h2 className="font-display text-lg font-medium">Konto</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Nazwa użytkownika</p>
+            <p className="mt-1 text-sm font-medium" aria-live="polite">
+              {username ?? "Wczytuję…"}
+            </p>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-card sm:p-5">
+            <h2 className="font-display text-lg font-medium">Zmiana hasła</h2>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Potwierdź obecne hasło, a następnie ustaw nowe.
+            </p>
+            <form className="mt-4 grid gap-3 sm:max-w-md" onSubmit={changePassword}>
+              <label className="grid gap-1.5 text-sm font-medium">
+                Obecne hasło
+                <Input name="currentPassword" type="password" autoComplete="current-password" required />
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium">
+                Nowe hasło
+                <Input name="newPassword" type="password" autoComplete="new-password" minLength={8} required />
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium">
+                Powtórz nowe hasło
+                <Input name="confirmPassword" type="password" autoComplete="new-password" minLength={8} required />
+              </label>
+              {passwordMessage && <p role="status" className="text-sm text-muted-foreground">{passwordMessage}</p>}
+              <Button type="submit" disabled={passwordBusy} className="w-full sm:w-fit">
+                {passwordBusy ? "Zmieniam hasło…" : "Zmień hasło"}
+              </Button>
+            </form>
+          </section>
+
           <section className="rounded-2xl border border-border bg-card p-4 shadow-card sm:p-5">
             <div className="flex items-start gap-3">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
