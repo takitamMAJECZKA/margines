@@ -1,7 +1,6 @@
 /**
- * User-level preferences are accessed through this small adapter so the
- * storage implementation can move from local storage to Supabase without
- * changing the settings UI or vocabulary flows.
+ * User-level preferences are stored in the browser only. This adapter keeps
+ * the settings UI and vocabulary flows independent from the storage details.
  */
 export type ThemePreference = "system" | "light" | "dark";
 export type DefaultWordInputLanguage = "dictionary" | "polish";
@@ -45,11 +44,6 @@ export function saveUserPreferences(
 ): UserPreferences {
   const preferences = { ...readUserPreferences(), ...update };
   replaceUserPreferences(preferences);
-  void import("@/db/cloud-sync")
-    .then(({ syncPreferences }) => syncPreferences(preferences))
-    .catch((error: unknown) => {
-      console.error("Could not sync user preferences to Supabase", error);
-    });
   return preferences;
 }
 

@@ -257,8 +257,7 @@ export function DictionaryOnboarding({
       </div>
 
       <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground/80">
-          Słowniki, słowa i postęp zapisują się na Twoim koncie i synchronizują
-          między urządzeniami.
+        Słowniki, słowa i postęp zapisują się lokalnie w tej przeglądarce.
       </p>
     </main>
   );

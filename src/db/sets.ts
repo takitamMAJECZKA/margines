@@ -3,12 +3,6 @@ import { normalizeWord } from "@/lib/utils";
 
 import { DuplicateSetNameError, ValidationError } from "./errors";
 import { db } from "./index";
-import {
-  deleteCloudRecord,
-  replaceCloudMembershipsForSet,
-  replaceCloudMembershipsForWord,
-  syncWordSet,
-} from "./cloud-sync";
 import type { SetWord, Word, WordSet } from "./types";
 
 function createId(): string {
@@ -73,7 +67,6 @@ export async function createSet(
   };
 
   await db.sets.add(set);
-  await syncWordSet(set.id);
   return set;
 }
 
@@ -91,13 +84,11 @@ export async function renameSet(id: string, name: string): Promise<WordSet> {
   };
 
   await db.sets.put(updated);
-  await syncWordSet(updated.id);
   return updated;
 }
 
 /** Removes the set only. The words themselves stay in the dictionary. */
 export async function deleteSet(id: string): Promise<void> {
-  await deleteCloudRecord("word_sets", id);
   await db.transaction("rw", db.sets, db.setWords, async () => {
     await db.setWords.where("setId").equals(id).delete();
     await db.sets.delete(id);
@@ -143,8 +134,6 @@ export async function addWordToSet(setId: string, wordId: string): Promise<void>
     dictionaryId: word.dictionaryId,
     createdAt: Date.now(),
   });
-  const memberships = await db.setWords.where("wordId").equals(wordId).toArray();
-  await replaceCloudMembershipsForWord(wordId, memberships);
 }
 
 export async function removeWordFromSet(
@@ -152,8 +141,6 @@ export async function removeWordFromSet(
   wordId: string,
 ): Promise<void> {
   await db.setWords.delete(`${setId}:${wordId}`);
-  const memberships = await db.setWords.where("wordId").equals(wordId).toArray();
-  await replaceCloudMembershipsForWord(wordId, memberships);
 }
 
 /** Replaces all words in one set without changing their other set memberships. */
@@ -197,8 +184,6 @@ export async function assignWordsToSet(
       })),
     );
   });
-  const memberships = await db.setWords.where("setId").equals(setId).toArray();
-  await replaceCloudMembershipsForSet(setId, memberships);
 }
 
 /**

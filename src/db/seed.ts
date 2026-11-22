@@ -39,8 +39,6 @@ export async function completeOnboarding(): Promise<void> {
     key: ONBOARDING_COMPLETED_KEY,
     value: Date.now(),
   });
-  const { syncOnboardingCompletion } = await import("./cloud-sync");
-  await syncOnboardingCompletion();
 }
 
 export async function markDictionaryUsed(id: string): Promise<void> {

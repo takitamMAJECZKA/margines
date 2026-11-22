@@ -3,7 +3,6 @@ import { OfflineBadge } from "@/components/offline-badge";
 import Link from "next/link";
 import { Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SignOutButton } from "@/components/auth/sign-out-button";
 
 export function AppHeader() {
   return (
@@ -12,7 +11,6 @@ export function AppHeader() {
         <Brand />
         <div className="flex items-center gap-1.5">
           <OfflineBadge />
-          <SignOutButton />
           <Button asChild variant="ghost" size="icon" aria-label="Ustawienia" title="Ustawienia" className="text-muted-foreground hover:text-foreground">
             <Link href="/settings"><Settings2 aria-hidden="true" /></Link>
           </Button>

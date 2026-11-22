@@ -12,7 +12,6 @@ import { normalizeWord } from "@/lib/utils";
 
 import { DuplicateDictionaryNameError, ValidationError } from "./errors";
 import { db } from "./index";
-import { deleteCloudRecord, syncDictionaries } from "./cloud-sync";
 import type { Dictionary } from "./types";
 
 function createId(): string {
@@ -74,7 +73,6 @@ export async function reorderDictionaries(ids: string[]): Promise<void> {
       ordered.map((dictionary, sortOrder) => ({ ...dictionary, sortOrder })),
     );
   });
-  await syncDictionaries();
 }
 
 export async function getDictionary(id: string): Promise<Dictionary | undefined> {
@@ -139,7 +137,6 @@ export async function createInitialDictionaries(
   });
 
   await db.dictionaries.bulkAdd(dictionaries);
-  await syncDictionaries(dictionaries.map((dictionary) => dictionary.id));
   return dictionaries;
 }
 
@@ -168,7 +165,6 @@ export async function createDictionary(
     };
     await db.dictionaries.add(dictionary);
   });
-  await syncDictionaries([dictionary.id]);
   return dictionary;
 }
 
@@ -189,7 +185,6 @@ export async function updateDictionary(
   };
 
   await db.dictionaries.put(updated);
-  await syncDictionaries([updated.id]);
   return updated;
 }
 
@@ -201,7 +196,6 @@ export async function renameDictionary(id: string, name: string): Promise<Dictio
 }
 
 export async function deleteDictionary(id: string): Promise<void> {
-  await deleteCloudRecord("dictionaries", id);
   await db.transaction(
     "rw",
     db.dictionaries,

@@ -1,8 +1,9 @@
-import type { NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/proxy";
+import { NextResponse } from "next/server";
 
-export function proxy(request: NextRequest) {
-  return updateSession(request);
+// Konta i logowanie są tymczasowo wyłączone. Aplikacja nie wymaga sesji,
+// więc proxy nie przekierowuje już niezalogowanych użytkowników na /login.
+export function proxy() {
+  return NextResponse.next();
 }
 
 export const config = {
