@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
 
 import { Providers } from "@/components/providers";
+import { getSupabaseConfig } from "@/lib/supabase/env";
 
 import "./globals.css";
 
@@ -61,6 +62,8 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const { url, key } = getSupabaseConfig();
+
   return (
     <html
       lang="pl"
@@ -68,7 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${inter.variable} ${fraunces.variable}`}
     >
       <body>
-        <Providers>{children}</Providers>
+        <Providers supabaseUrl={url} supabaseKey={key}>{children}</Providers>
       </body>
     </html>
   );

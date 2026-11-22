@@ -161,8 +161,22 @@ npm run build
 
 ## Konfiguracja środowiska
 
-Skopiuj `.env.example` do `.env.local`. Wszystkie zmienne są **serwerowe** —
-bez prefiksu `NEXT_PUBLIC_` — więc klucze nie trafiają do bundle'a klienta.
+Skopiuj `.env.example` do `.env.local`. Zmienne serwerowe nie mają prefiksu
+`NEXT_PUBLIC_`, więc klucze API nie trafiają do bundle'a klienta.
+
+### Supabase
+
+| Zmienna                    | Opis                                                       |
+| -------------------------- | ---------------------------------------------------------- |
+| `SUPABASE_URL`             | Adres projektu Supabase                                    |
+| `SUPABASE_PUBLISHABLE_KEY` | Klucz publishable/anon — publiczny, chroniony przez RLS    |
+
+Nazwy bez prefiksu `NEXT_PUBLIC_` pozwalają dodać je w Vercel jako **Config**
+lub **Secret**. Aplikacja odczytuje je na serwerze i przekazuje bezpieczne
+wartości do przeglądarki. Starsze nazwy `NEXT_PUBLIC_SUPABASE_URL` i
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` są nadal obsługiwane. Nigdy nie
+umieszczaj w aplikacji klucza `service_role` — on nie może trafić do
+przeglądarki. Po zmianie zmiennych w Vercel uruchom ponowny deploy.
 
 ### Tłumaczenie
 

@@ -9,15 +9,21 @@ import { Toaster } from "sonner";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { Button } from "@/components/ui/button";
 import { clearCloudUserCache, initializeCloudData } from "@/db/cloud-sync";
-import { createClient } from "@/lib/supabase/client";
+import { configureSupabase, createClient } from "@/lib/supabase/client";
 import { readUserPreferences } from "@/lib/user-preferences";
 import { useTheme } from "next-themes";
 
-function CloudDataGate({ children }: { children: ReactNode }) {
-  const configured = Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-  );
+interface SupabaseConfigProps {
+  supabaseUrl: string;
+  supabaseKey: string;
+}
+
+function CloudDataGate({
+  children,
+  supabaseUrl,
+  supabaseKey,
+}: SupabaseConfigProps & { children: ReactNode }) {
+  const configured = Boolean(supabaseUrl && supabaseKey);
   const supabase = useMemo(() => (configured ? createClient() : null), [configured]);
   const { setTheme } = useTheme();
   const pathname = usePathname();
@@ -128,7 +134,13 @@ function CloudDataGate({ children }: { children: ReactNode }) {
   return children;
 }
 
-export function Providers({ children }: { children: ReactNode }) {
+export function Providers({
+  children,
+  supabaseUrl,
+  supabaseKey,
+}: SupabaseConfigProps & { children: ReactNode }) {
+  configureSupabase({ url: supabaseUrl, key: supabaseKey });
+
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -153,7 +165,9 @@ export function Providers({ children }: { children: ReactNode }) {
       disableTransitionOnChange
     >
       <QueryClientProvider client={queryClient}>
-        <CloudDataGate>{children}</CloudDataGate>
+        <CloudDataGate supabaseUrl={supabaseUrl} supabaseKey={supabaseKey}>
+          {children}
+        </CloudDataGate>
         <Toaster
           position="top-center"
           offset={16}

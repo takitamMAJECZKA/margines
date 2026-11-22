@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
 const GENERIC_ERROR = "Nieprawidłowa nazwa użytkownika lub hasło.";
@@ -22,8 +23,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: GENERIC_ERROR }, { status: 400 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const { url, key } = getSupabaseConfig();
   if (!url || !key) return NextResponse.json({ error: "Brak konfiguracji Supabase." }, { status: 503 });
 
   try {
