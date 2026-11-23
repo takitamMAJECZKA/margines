@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useTheme } from "next-themes";
-import { ArrowDown, ArrowLeft, ArrowUp, Languages, Palette } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, Languages, Palette } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppHeader } from "@/components/app-header";
@@ -15,6 +15,7 @@ import { useDatabaseReady } from "@/hooks/use-database-ready";
 import { LANGUAGES } from "@/lib/languages";
 import {
   readDefaultWordInputLanguage,
+  readShowStudyExamples,
   saveUserPreferences,
   subscribeUserPreferences,
   type DefaultWordInputLanguage,
@@ -29,6 +30,11 @@ export function SettingsScreen() {
     subscribeUserPreferences,
     readDefaultWordInputLanguage,
     () => "dictionary" as DefaultWordInputLanguage,
+  );
+  const showStudyExamples = useSyncExternalStore(
+    subscribeUserPreferences,
+    readShowStudyExamples,
+    () => true,
   );
   const [reordering, setReordering] = useState(false);
 
@@ -139,6 +145,37 @@ export function SettingsScreen() {
                 >
                   <option value="dictionary">Język wybranego słownika</option>
                   <option value="polish">Polski</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-card sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <BookOpen className="size-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-display text-lg font-medium">
+                  Przykładowe zdania na fiszkach
+                </h2>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                  Zdania z Tatoeba albo wygenerowane przez AI są domyślnie
+                  widoczne w obu trybach fiszek. Możesz je ukryć — wtedy zostaje
+                  samo słowo i tłumaczenie.
+                </p>
+                <select
+                  value={showStudyExamples ? "on" : "off"}
+                  onChange={(event) =>
+                    saveUserPreferences({
+                      showStudyExamples: event.target.value === "on",
+                    })
+                  }
+                  className="mt-3 h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:max-w-xs"
+                  aria-label="Przykładowe zdania na fiszkach"
+                >
+                  <option value="on">Włączone (domyślnie)</option>
+                  <option value="off">Wyłączone</option>
                 </select>
               </div>
             </div>

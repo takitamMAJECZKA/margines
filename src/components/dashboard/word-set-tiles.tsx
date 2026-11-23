@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Clock3,
   FolderOpen,
   Layers,
   ListPlus,
@@ -19,6 +20,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { WordSet } from "@/db/types";
+import {
+  isRecentSetId,
+  RECENT_SET_ID,
+  RECENT_SET_LIMIT,
+  RECENT_SET_NAME,
+} from "@/lib/study-scope";
 import { cn, pluralizePolish } from "@/lib/utils";
 
 interface WordSetTilesProps {
@@ -68,6 +75,30 @@ export function WordSetTiles({
           <span className="block truncate text-sm font-semibold">Wszystkie</span>
           <span className="mt-0.5 block text-[11px] text-muted-foreground">
             {countLabel(totalCount)}
+          </span>
+        </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onSelect(RECENT_SET_ID)}
+        aria-pressed={isRecentSetId(activeSetId)}
+        className={cn(
+          "group flex flex-col justify-between rounded-2xl border p-3.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60",
+          isRecentSetId(activeSetId)
+            ? "border-primary/35 bg-primary/[0.055]"
+            : "border-border bg-card hover:border-primary/25 hover:bg-card/80",
+        )}
+      >
+        <span className="flex size-9 items-center justify-center rounded-xl bg-secondary text-foreground/75">
+          <Clock3 className="size-[18px]" aria-hidden="true" />
+        </span>
+        <span className="mt-5 block">
+          <span className="block truncate text-sm font-semibold">
+            {RECENT_SET_NAME}
+          </span>
+          <span className="mt-0.5 block text-[11px] text-muted-foreground">
+            {countLabel(Math.min(totalCount, RECENT_SET_LIMIT))} · automatyczna
           </span>
         </span>
       </button>

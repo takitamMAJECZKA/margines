@@ -60,8 +60,13 @@ słownik lokalnie na urządzeniu.
 ### Nauka
 
 - Sesja fiszek z wybranego słownika albo zestawu, losowa kolejność.
-- Wybór zakresu nauki: „Wszystkie słowa” lub konkretny zestaw. Link z kafelka
-  zestawu otwiera naukę od razu w tym zakresie (`/study?set=…`).
+- Wybór zakresu nauki: „Wszystkie słowa”, automatyczna grupa „30 ostatnio
+  dodanych” albo konkretny zestaw. Link z kafelka zestawu otwiera naukę od razu
+  w tym zakresie (`/study?set=…`).
+- Trzy wejścia do nauki na każdym słowniku i zestawie: powtórka wszystkiego,
+  codzienna powtórka (`mode=daily`) oraz quiz ABCD (`mode=quiz`).
+- Przykładowe zdania (Tatoeba/AI) są domyślnie widoczne w obu trybach fiszek;
+  można je ukryć przełącznikiem w nauce lub w ustawieniach.
 - Przód karty: polskie tłumaczenie; po odsłonięciu: słowo w języku źródłowym
   i przykład.
 - „Znam” zdejmuje kartę z kolejki, „Nie znam” przenosi ją na koniec.
@@ -74,6 +79,8 @@ słownik lokalnie na urządzeniu.
 - Ponowne uruchomienie sesji i zmiana zakresu nauki.
 - Skróty klawiszowe na desktopie: `Spacja`/`Enter` odsłania, `1` = nie znam,
   `2` = znam.
+- Tryb ABCD: zdanie z Tatoeba z luką i cztery odpowiedzi (A–D; skróty `1`–`4`).
+  Quiz nie zmienia gwiazdek znajomości słowa.
 - Lekkie metadane powtórek (`reviewCount`, `lastReviewedAt`,
   `lastReviewKnown`) przygotowują grunt pod przyszły SRS.
 

@@ -5,6 +5,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import {
   AlertCircle,
   ArrowLeft,
+  Clock3,
   FolderOpen,
   ListPlus,
   MoreHorizontal,
@@ -34,6 +35,12 @@ import {
   languagePairLabel,
 } from "@/lib/languages";
 import type { ForeignLanguageCode } from "@/lib/languages";
+import { quizCandidateWords } from "@/lib/quiz";
+import {
+  isRecentSetId,
+  recentWords,
+  resolveStudySet,
+} from "@/lib/study-scope";
 import { foldForSearch, wordCountLabel } from "@/lib/utils";
 
 import { AddWordDialog } from "./add-word-dialog";
@@ -105,9 +112,10 @@ export function Dashboard() {
   }
 
   const activeSet = useMemo(
-    () => (activeSetId ? (sets?.find((set) => set.id === activeSetId) ?? null) : null),
-    [activeSetId, sets],
+    () => (activeSetId ? resolveStudySet(sets, activeSetId, selected) : null),
+    [activeSetId, sets, selected],
   );
+  const recentActive = isRecentSetId(activeSetId);
 
   const scopeKey = `${selectedId ?? ""}:${activeSetId ?? "all"}`;
   const [searchState, setSearchState] = useState<{ scopeKey: string; value: string }>(
@@ -143,6 +151,8 @@ export function Dashboard() {
   const words = useMemo(() => {
     if (!allWords) return [];
 
+    if (isRecentSetId(activeSetId)) return recentWords(allWords);
+
     if (!activeSet) return allWords;
 
     const ids = new Set(
@@ -152,7 +162,7 @@ export function Dashboard() {
     );
 
     return allWords.filter((word) => ids.has(word.id));
-  }, [allWords, activeSet, memberships]);
+  }, [allWords, activeSet, activeSetId, memberships]);
 
   const normalizedSearch = foldForSearch(search.trim());
 
@@ -168,6 +178,14 @@ export function Dashboard() {
       ].some((value) => foldForSearch(value).includes(normalizedSearch)),
     );
   }, [words, normalizedSearch]);
+
+  const quizCount = useMemo(
+    () =>
+      selected
+        ? quizCandidateWords(words, selected.sourceLanguage).length
+        : 0,
+    [words, selected],
+  );
 
   if (
     !ready ||
@@ -397,7 +415,11 @@ export function Dashboard() {
                     </button>
                     <div className="mt-2 flex items-center gap-2.5">
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                        <FolderOpen className="size-[18px]" aria-hidden="true" />
+                        {recentActive ? (
+                          <Clock3 className="size-[18px]" aria-hidden="true" />
+                        ) : (
+                          <FolderOpen className="size-[18px]" aria-hidden="true" />
+                        )}
                       </span>
                       <h2
                         id="active-set-heading"
@@ -407,47 +429,50 @@ export function Dashboard() {
                       </h2>
                     </div>
                     <p className="mt-1.5 text-xs text-muted-foreground">
-                      {wordCountLabel(scopedWordCount)} · nowe słowa trafią od razu
-                      do tego zestawu
+                      {recentActive
+                        ? `${wordCountLabel(scopedWordCount)} · automatyczna grupa 30 najnowszych słów`
+                        : `${wordCountLabel(scopedWordCount)} · nowe słowa trafią od razu do tego zestawu`}
                     </p>
                   </div>
 
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Zarządzaj zestawem ${activeSet.name}`}
-                        className="shrink-0 text-muted-foreground"
-                      >
-                        <MoreHorizontal />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => setAssigningSet(activeSet)}>
-                        <ListPlus />
-                        Przypisz słowa
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          setEditingSet(activeSet);
-                          setSetFormOpen(true);
-                        }}
-                      >
-                        <Pencil />
-                        Zmień nazwę zestawu
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onSelect={() => setDeletingSet(activeSet)}
-                      >
-                        <Trash2 />
-                        Usuń zestaw
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {recentActive ? null : (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Zarządzaj zestawem ${activeSet.name}`}
+                          className="shrink-0 text-muted-foreground"
+                        >
+                          <MoreHorizontal />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => setAssigningSet(activeSet)}>
+                          <ListPlus />
+                          Przypisz słowa
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            setEditingSet(activeSet);
+                            setSetFormOpen(true);
+                          }}
+                        >
+                          <Pencil />
+                          Zmień nazwę zestawu
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onSelect={() => setDeletingSet(activeSet)}
+                        >
+                          <Trash2 />
+                          Usuń zestaw
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               </section>
             ) : (
@@ -486,6 +511,7 @@ export function Dashboard() {
 
             <StudyBanner
               count={scopedWordCount}
+              quizCount={quizCount}
               wordSet={activeSet}
               dictionary={selected}
             />
@@ -493,7 +519,7 @@ export function Dashboard() {
 
           <section className="mt-9">
             {scopedWordCount === 0 ? (
-              activeSet ? (
+              activeSet && !recentActive ? (
                 <EmptySet
                   setName={activeSet.name}
                   onAdd={() => openAddWord(search.trim())}
@@ -517,9 +543,11 @@ export function Dashboard() {
                   <h2 className="text-[10px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                     {normalizedSearch
                       ? `Wyniki · ${filteredWords.length}`
-                      : activeSet
-                        ? "Słowa w zestawie"
-                        : "Ostatnio dodane"}
+                      : recentActive
+                        ? activeSet?.name ?? "Ostatnio dodane"
+                        : activeSet
+                          ? "Słowa w zestawie"
+                          : "Ostatnio dodane"}
                   </h2>
                   <span className="text-[11px] text-muted-foreground">
                     {filteredWords.length}{" "}
@@ -593,7 +621,7 @@ export function Dashboard() {
             }}
             dictionary={selected}
             initialWord={addWordRequest?.initialWord ?? ""}
-            setIds={activeSet ? [activeSet.id] : []}
+            setIds={activeSet && !recentActive ? [activeSet.id] : []}
             onAdded={() => updateSearch("")}
           />
           <SetFormDialog

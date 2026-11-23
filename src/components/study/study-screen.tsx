@@ -1,31 +1,39 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
-  ArrowLeft,
-  BookOpen,
   Check,
   Eye,
+  EyeOff,
   FolderOpen,
   Layers,
   Play,
   RotateCcw,
-  Settings2,
   Sparkles,
   Undo2,
   Volume2,
 } from "lucide-react";
 
 import { KnowledgeStars } from "@/components/knowledge-stars";
-import { OfflineBadge } from "@/components/offline-badge";
+import { QuizScreen } from "@/components/study/quiz-screen";
+import { StudyScopeSelector } from "@/components/study/scope-selector";
+import {
+  StudyEmpty,
+  StudyHeader,
+  StudyScreenFallback,
+} from "@/components/study/study-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/select-native";
-import { Skeleton } from "@/components/ui/skeleton";
 import { listDictionaries } from "@/db/dictionaries";
 import { listSets, listWordsForSet } from "@/db/sets";
 import type { Word, WordSet } from "@/db/types";
@@ -39,15 +47,28 @@ import {
 import { useDatabaseReady } from "@/hooks/use-database-ready";
 import { useDictionarySelection } from "@/hooks/use-dictionary-selection";
 import { useSpeech } from "@/hooks/use-speech";
+import { clozeSentence } from "@/lib/cloze";
 import {
   DICTIONARY_COLOR_HEX,
   LANGUAGES,
   languagePairLabel,
 } from "@/lib/languages";
-import { pluralizePolish, wordCountLabel } from "@/lib/utils";
+import {
+  isRecentSetId,
+  recentWords,
+  resolveStudySet,
+} from "@/lib/study-scope";
+import {
+  readShowStudyExamples,
+  saveUserPreferences,
+  subscribeUserPreferences,
+} from "@/lib/user-preferences";
+import { cn, pluralizePolish, wordCountLabel } from "@/lib/utils";
 
 import { studyReducer } from "./session-reducer";
 import { SwipeableCard } from "./swipeable-card";
+
+type StudyMode = "standard" | "daily" | "quiz";
 
 function translationSizeClass(text: string): string {
   const length = text.length;
@@ -63,32 +84,6 @@ function pairedPromptSizeClass(text: string): string {
   if (length < 110) return "text-[clamp(1.25rem,4.6vw,1.75rem)]";
   if (length < 170) return "text-[clamp(1.05rem,3.8vw,1.4rem)]";
   return "text-sm sm:text-base";
-}
-
-function clozeSentence(word: Word, language: string): string | null {
-  let term = word.originalWord.trim();
-  const articlePattern =
-    language === "de"
-      ? /^(?:der|die|das|den|dem|des)\s+/i
-      : language === "es"
-        ? /^(?:el|la|los|las|un|una|unos|unas)\s+/i
-        : language === "fr"
-          ? /^(?:le|la|les|l['’]|un|une|des)\s*/i
-          : /^(?:a|an|the)\s+/i;
-  term = term.replace(articlePattern, "").trim();
-  if (!term) return null;
-
-  const escaped = term
-    .split(/\s+/)
-    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-    .join("\\s+");
-  const endings = language === "de" ? "(?:e|en|er|n|s)?" : "(?:s|es)?";
-  const pattern = new RegExp(
-    `(?<![\\p{L}\\p{M}])${escaped}${endings}(?![\\p{L}\\p{M}])`,
-    "iu",
-  );
-  const cloze = word.exampleSentence.replace(pattern, "_____");
-  return cloze === word.exampleSentence ? null : cloze;
 }
 
 const DAILY_REVIEW_INTERVALS = [0, 3, 24, 24 * 3, 24 * 7, 24 * 20].map(
@@ -115,73 +110,13 @@ function dailyReviewWords(words: Word[], now = Date.now()): Word[] {
       );
 }
 
-function StudyHeader() {
-  return (
-    <header className="border-b border-border/60 pt-[env(safe-area-inset-top)]">
-      <div className="mx-auto flex h-14 w-full max-w-2xl items-center justify-between px-4 sm:px-6">
-        <Button
-          asChild
-          variant="ghost"
-          size="sm"
-          className="-ml-2 text-muted-foreground"
-        >
-          <Link href="/">
-            <ArrowLeft />
-            Słownik
-          </Link>
-        </Button>
-        <div className="flex items-center gap-1.5">
-          <OfflineBadge />
-          <Button asChild variant="ghost" size="icon" aria-label="Ustawienia" title="Ustawienia" className="text-muted-foreground hover:text-foreground">
-            <Link href="/settings"><Settings2 aria-hidden="true" /></Link>
-          </Button>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-function StudyEmpty({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-6 py-16 text-center">
-      <div className="flex size-16 items-center justify-center rounded-2xl border border-border bg-card text-primary shadow-card">
-        <BookOpen className="size-7" aria-hidden="true" />
-      </div>
-      <h1 className="mt-6 font-display text-3xl font-medium tracking-tight">
-        {title}
-      </h1>
-      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-        {description}
-      </p>
-      <Button asChild className="mt-7">
-        <Link href="/">Wróć do słownika</Link>
-      </Button>
-    </main>
-  );
-}
-
-export function StudyScreenFallback() {
-  return (
-    <div className="flex min-h-dvh flex-col">
-      <StudyHeader />
-      <main className="mx-auto flex w-full max-w-xl flex-1 items-center px-4">
-        <Skeleton className="h-[26rem] w-full rounded-3xl" />
-      </main>
-    </div>
-  );
-}
-
 export function StudyScreen() {
   const searchParams = useSearchParams();
   const initialSetId = searchParams.get("set");
   const initialDictionaryId = searchParams.get("dictionary");
-  const mode = searchParams.get("mode") === "daily" ? "daily" : "standard";
+  const modeParam = searchParams.get("mode");
+  const mode: StudyMode =
+    modeParam === "daily" ? "daily" : modeParam === "quiz" ? "quiz" : "standard";
 
   return (
     <StudyScreenContent
@@ -200,7 +135,7 @@ function StudyScreenContent({
 }: {
   initialSetId: string | null;
   initialDictionaryId: string | null;
-  mode: "standard" | "daily";
+  mode: StudyMode;
 }) {
   const { ready } = useDatabaseReady();
   const dictionaries = useLiveQuery(() => listDictionaries(), []);
@@ -213,23 +148,39 @@ function StudyScreenContent({
 
   const [scopeId, setScopeId] = useState<string | null>(initialSetId);
   const scopedSet = useMemo(
-    () => (scopeId ? (sets?.find((set) => set.id === scopeId) ?? null) : null),
-    [scopeId, sets],
+    () => (scopeId ? resolveStudySet(sets, scopeId, selected) : null),
+    [scopeId, sets, selected],
   );
 
   const words = useLiveQuery(
-    () =>
-      selected && sets
-        ? scopedSet
-          ? listWordsForSet(scopedSet.id)
-          : listWords(selected.id)
-        : undefined,
-    [selected?.id, sets, scopedSet?.id],
+    () => {
+      if (!selected || sets === undefined) return undefined;
+      if (scopeId && isRecentSetId(scopeId)) {
+        return listWords(selected.id).then(recentWords);
+      }
+      return scopedSet ? listWordsForSet(scopedSet.id) : listWords(selected.id);
+    },
+    [selected?.id, sets, scopeId, scopedSet?.id],
   );
+
+  // Quiz distractors may come from the whole dictionary, not just the scope.
+  const dictionaryWords = useLiveQuery(
+    () => (selected ? listWords(selected.id) : undefined),
+    [selected?.id],
+  );
+
+  const showExamples = useSyncExternalStore(
+    subscribeUserPreferences,
+    readShowStudyExamples,
+    () => true,
+  );
+
+  function toggleExamples() {
+    saveUserPreferences({ showStudyExamples: !showExamples });
+  }
+
   const studyWords =
-    words && mode === "daily"
-      ? dailyReviewWords(words)
-      : words ?? [];
+    words && mode === "daily" ? dailyReviewWords(words) : (words ?? []);
 
   const [session, dispatch] = useReducer(studyReducer, null);
   const isStudying = Boolean(session && !session.finished);
@@ -260,7 +211,11 @@ function StudyScreenContent({
   function startSession() {
     if (studyWords.length === 0) return;
     previousProgressRef.current = [];
-    dispatch({ type: "start", words: studyWords, mode });
+    dispatch({
+      type: "start",
+      words: studyWords,
+      mode: mode === "daily" ? "daily" : "standard",
+    });
   }
 
   function resetSession() {
@@ -443,7 +398,7 @@ function StudyScreenContent({
     );
   }
 
-  if (words === undefined) {
+  if (words === undefined || dictionaryWords === undefined) {
     return <StudyScreenFallback />;
   }
 
@@ -454,7 +409,11 @@ function StudyScreenContent({
         {scopedSet ? (
           <StudyEmpty
             title="Ten zestaw jest pusty"
-            description={`Dodaj słowa do zestawu „${scopedSet.name}” na stronie głównej, aby uczyć się ich fiszkami.`}
+            description={
+              isRecentSetId(scopedSet.id)
+                ? `Słownik „${selected.name}” nie ma jeszcze słów, więc grupa „${scopedSet.name}” też jest pusta.`
+                : `Dodaj słowa do zestawu „${scopedSet.name}” na stronie głównej, aby uczyć się ich fiszkami.`
+            }
           />
         ) : (
           <StudyEmpty
@@ -463,6 +422,19 @@ function StudyScreenContent({
           />
         )}
       </div>
+    );
+  }
+
+  if (mode === "quiz") {
+    return (
+      <QuizScreen
+        dictionary={selected}
+        wordSet={scopedSet}
+        words={words}
+        dictionaryWords={dictionaryWords}
+        sets={sets ?? []}
+        onChangeScope={changeScope}
+      />
     );
   }
 
@@ -483,9 +455,17 @@ function StudyScreenContent({
   const completedCount = session?.mode === "daily" ? session.attempts : knownCount;
   const progress = total === 0 ? 0 : Math.round((completedCount / total) * 100);
   const clozePrompt =
-    session?.current && !selected.isNative && session.current.exampleSentence
+    showExamples &&
+    session?.current &&
+    !selected.isNative &&
+    session.current.exampleSentence
       ? clozeSentence(session.current, selected.sourceLanguage)
       : null;
+  const contextLabel = scopedSet
+    ? isRecentSetId(scopedSet.id)
+      ? "30 najnowszych słów"
+      : "tylko ten zestaw"
+    : null;
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -506,25 +486,13 @@ function StudyScreenContent({
           </p>
 
           <div className="mt-8 rounded-3xl border border-border bg-card p-5 shadow-card">
-            {sets.length > 0 ? (
-              <div className="mb-5 grid gap-2">
-                <Label htmlFor="study-scope">Zakres nauki</Label>
-                <NativeSelect
-                  id="study-scope"
-                  value={scopedSet?.id ?? ""}
-                  onChange={(event) => changeScope(event.target.value)}
-                >
-                  <option value="">Wszystkie słowa</option>
-                  {sets.map((set) => (
-                    <option key={set.id} value={set.id}>
-                      {set.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
-            ) : null}
+            <StudyScopeSelector
+              sets={sets ?? []}
+              value={scopedSet?.id ?? ""}
+              onChange={changeScope}
+            />
 
-            <div className="flex items-center gap-3.5">
+            <div className="mt-5 flex items-center gap-3.5 border-t border-dashed border-border pt-5">
               <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 {scopedSet ? (
                   <FolderOpen className="size-5" aria-hidden="true" />
@@ -552,7 +520,7 @@ function StudyScreenContent({
                     selected.isNative,
                   )}{" "}
                   · {wordCountLabel(studyWords.length)}
-                  {scopedSet ? " · tylko ten zestaw" : ""}
+                  {contextLabel ? ` · ${contextLabel}` : ""}
                 </p>
               </div>
               <Badge variant="secondary" className="shrink-0">
@@ -571,6 +539,49 @@ function StudyScreenContent({
                 "Front pokazuje polskie tłumaczenie. Przesuń fiszkę w lewo, jeśli nie znasz słowa, albo w prawo, jeśli je znasz — bez odwracania karty."
               )}
             </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showExamples}
+              onClick={toggleExamples}
+              className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-border/80 bg-secondary/40 px-3.5 py-2.5 text-left outline-none transition-colors hover:bg-secondary/70 focus-visible:ring-2 focus-visible:ring-ring/60"
+            >
+              <span className="flex min-w-0 items-center gap-2.5">
+                {showExamples ? (
+                  <Eye className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                ) : (
+                  <EyeOff
+                    className="size-4 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">
+                    Przykładowe zdania
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                    {showExamples
+                      ? "Włączone — fiszki pokazują zapisane zdania"
+                      : "Wyłączone — tylko słowo i tłumaczenie"}
+                  </span>
+                </span>
+              </span>
+              <span
+                className={cn(
+                  "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+                  showExamples ? "bg-primary" : "bg-muted-foreground/30",
+                )}
+                aria-hidden="true"
+              >
+                <span
+                  className={cn(
+                    "absolute top-0.5 size-5 rounded-full bg-background shadow transition-[left]",
+                    showExamples ? "left-[1.375rem]" : "left-0.5",
+                  )}
+                />
+              </span>
+            </button>
           </div>
 
           <Button
@@ -639,6 +650,28 @@ function StudyScreenContent({
                   ? `${completedCount} / ${total} powtórzone`
                   : `${knownCount} / ${total} opanowane`}
               </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={toggleExamples}
+                role="switch"
+                aria-checked={showExamples}
+                aria-label="Przykładowe zdania na fiszkach"
+                title={
+                  showExamples
+                    ? "Ukryj przykładowe zdania"
+                    : "Pokaż przykładowe zdania"
+                }
+                className={cn(
+                  "size-8 rounded-full",
+                  showExamples
+                    ? "text-primary hover:text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {showExamples ? <Eye /> : <EyeOff />}
+              </Button>
               {session.history.length > 0 ? (
                 <Button
                   type="button"
@@ -786,7 +819,7 @@ function StudyScreenContent({
                     {session.current.translation}
                   </p>
 
-                  {session.current.exampleSentence ? (
+                  {showExamples && session.current.exampleSentence ? (
                     <blockquote className="mx-auto mt-4 w-full max-w-md border-t border-border/70 px-1 py-3 sm:px-2">
                       <p className={`text-balance font-display leading-[1.3] font-medium tracking-[-0.025em] whitespace-pre-line break-words text-foreground/85 ${pairedPromptSizeClass(session.current.exampleSentence)}`}>
                         „{session.current.exampleSentence}”

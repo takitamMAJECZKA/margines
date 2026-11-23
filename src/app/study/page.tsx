@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 
-import { StudyScreen, StudyScreenFallback } from "@/components/study/study-screen";
+import { StudyScreen } from "@/components/study/study-screen";
+import { StudyScreenFallback } from "@/components/study/study-layout";
 
 export const metadata: Metadata = {
   title: "Nauka fiszek",

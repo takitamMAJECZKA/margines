@@ -490,6 +490,7 @@ async function replaceLocalFromCloud(userId: string): Promise<void> {
     replaceUserPreferences({
       theme: preferencesRow.theme as UserPreferences["theme"],
       defaultWordInputLanguage: preferencesRow.default_word_input_language as UserPreferences["defaultWordInputLanguage"],
+      showStudyExamples: DEFAULT_USER_PREFERENCES.showStudyExamples,
     });
   } else {
     const { error } = await supabase

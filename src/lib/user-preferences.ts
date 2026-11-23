@@ -8,11 +8,14 @@ export type DefaultWordInputLanguage = "dictionary" | "polish";
 export interface UserPreferences {
   theme: ThemePreference;
   defaultWordInputLanguage: DefaultWordInputLanguage;
+  /** Whether flashcards show the saved Tatoeba/AI example sentence. */
+  showStudyExamples: boolean;
 }
 
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   theme: "system",
   defaultWordInputLanguage: "dictionary",
+  showStudyExamples: true,
 };
 
 const USER_PREFERENCES_KEY = "margines:user-preferences";
@@ -33,6 +36,7 @@ export function readUserPreferences(): UserPreferences {
           : "system",
       defaultWordInputLanguage:
         parsed.defaultWordInputLanguage === "polish" ? "polish" : "dictionary",
+      showStudyExamples: parsed.showStudyExamples !== false,
     };
   } catch {
     return DEFAULT_USER_PREFERENCES;
@@ -72,4 +76,8 @@ export function subscribeUserPreferences(onChange: () => void): () => void {
 
 export function readDefaultWordInputLanguage(): DefaultWordInputLanguage {
   return readUserPreferences().defaultWordInputLanguage;
+}
+
+export function readShowStudyExamples(): boolean {
+  return readUserPreferences().showStudyExamples;
 }
