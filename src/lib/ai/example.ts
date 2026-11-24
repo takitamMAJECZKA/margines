@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
+import { findExactForm, findSurfaceForm } from "@/lib/cloze";
 import { LANGUAGES, type LanguageCode } from "@/lib/languages";
 import { ProviderRequestError } from "@/lib/server/errors";
 import { fetchWithTimeout, readJson } from "@/lib/server/http";
@@ -21,6 +22,8 @@ const DEFAULT_GOOGLE_EMERGENCY_MODEL = "gemini-3.1-flash-lite";
 const aiResponseSchema = z.object({
   sentence: z.string().trim().min(8).max(500),
   translation: z.string().trim().min(1).max(500),
+  /** Exact inflected form used in the sentence, copied verbatim. */
+  answer: z.string().trim().max(120).nullish(),
 });
 
 interface ChatCompletionResponse {
@@ -45,6 +48,8 @@ interface GeminiResponse {
 export interface GeneratedExample {
   text: string;
   translation: string;
+  /** Exact surface form that should fill the cloze gap; empty when unknown. */
+  answer: string;
   model: string;
 }
 
@@ -103,11 +108,14 @@ function examplePrompt(word: string, sourceLanguage: LanguageCode): string {
 
   return [
     "You create short, natural language-learning examples.",
-    `Create one original example sentence in ${language} that uses the exact word or phrase: "${word}".`,
-    "The sentence should be natural, between 8 and 18 words, and suitable for an adult learner.",
+    `Write ONE original, grammatically correct sentence in ${language} that naturally uses the word or phrase "${word}".`,
+    "You may and should use any correct inflected form of that word: conjugation, tense, person, number, case or gender. Never replace it with an unrelated synonym and never force the dictionary form when it would be ungrammatical.",
+    "The sentence must contain that used form verbatim, so it can be copied exactly and turned into a gap-fill exercise.",
+    "Keep the sentence natural, between 8 and 18 words, and suitable for an adult learner.",
     "Also provide an accurate Polish translation of that sentence.",
     "Do not explain your reasoning. Do not use markdown.",
-    'Return exactly one JSON object and nothing else: {"sentence": "...", "translation": "..."}',
+    'Return exactly one JSON object and nothing else: {"sentence": "...", "translation": "...", "answer": "..."}',
+    'The "answer" field is required. Copy into it the exact contiguous text from "sentence" that is the used form of the target word — the part a learner would fill in a gap. It may differ from the dictionary form, for example sentence "She went home yesterday." for "go" gives answer "went", and "On idzie do domu." for "iść" gives answer "idzie".',
   ].join("\n");
 }
 
@@ -351,20 +359,25 @@ export async function generateAiExample(
     );
   }
 
-  if (
-    !parsed.data.sentence
-      .toLocaleLowerCase("pl")
-      .includes(word.toLocaleLowerCase("pl"))
-  ) {
-    throw new ProviderRequestError(
-      "UNAVAILABLE",
-      "Wygenerowane zdanie nie zawiera podanego słowa. Spróbuj ponownie.",
-    );
-  }
+  const sentence = parsed.data.sentence;
+
+  // Never reject a natural sentence just because it uses an inflected form
+  // ("go" → "went", "iść" → "idzie"). Prefer the exact form reported by the
+  // model, then fall back to the deterministic matcher, and finally accept
+  // the sentence without a gap.
+  const reportedForm = (parsed.data.answer ?? "")
+    .trim()
+    .replace(/^[^\p{L}\p{M}]+|[^\p{L}\p{M}]+$/gu, "");
+  const reportedMatch = reportedForm
+    ? findExactForm(sentence, reportedForm)
+    : null;
+  const detectedMatch = findSurfaceForm(sentence, word, sourceLanguage);
+  const answer = reportedMatch?.answer ?? detectedMatch?.answer ?? "";
 
   return {
-    text: parsed.data.sentence,
+    text: sentence,
     translation: parsed.data.translation,
+    answer,
     model,
   };
 }

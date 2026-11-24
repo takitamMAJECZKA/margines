@@ -37,7 +37,7 @@ function aiExampleId(word: string, sourceLanguage: ForeignLanguageCode): string 
 }
 
 function toExample(
-  generated: { text: string; translation: string; model: string },
+  generated: { text: string; translation: string; answer: string; model: string },
   word: string,
   sourceLanguage: ForeignLanguageCode,
 ): AuthenticExample {
@@ -50,6 +50,7 @@ function toExample(
     attribution: generated.model,
     license: "",
     hasDirectTranslation: false,
+    answer: generated.answer,
   };
 }
 

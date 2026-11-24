@@ -123,6 +123,9 @@ export function EditWordDialog({
       translation,
       exampleSentence: alternativeExample?.text ?? word.exampleSentence,
       exampleTranslation: alternativeExample?.translation ?? word.exampleTranslation,
+      exampleAnswer: alternativeExample
+        ? (alternativeExample.answer ?? "")
+        : (word.exampleAnswer ?? ""),
       exampleType: alternativeExample
         ? alternativeExample.source === "AI"
           ? "ai"

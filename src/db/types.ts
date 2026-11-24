@@ -23,6 +23,8 @@ export interface Word {
   translation: string;
   exampleSentence: string;
   exampleTranslation: string;
+  /** Exact form of the word to blank out; resolved when the example is saved. */
+  exampleAnswer?: string;
   exampleSource: string;
   exampleSourceUrl: string;
   exampleAttribution: string;
@@ -81,6 +83,7 @@ export type WordDraft = Pick<
   | "translation"
   | "exampleSentence"
   | "exampleTranslation"
+  | "exampleAnswer"
   | "exampleSource"
   | "exampleSourceUrl"
   | "exampleAttribution"

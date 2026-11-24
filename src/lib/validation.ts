@@ -69,6 +69,8 @@ export const wordDraftSchema = z.object({
     .string()
     .trim()
     .max(500, "Tłumaczenie zdania może mieć maksymalnie 500 znaków."),
+  /** Exact inflected form that fills the gap in `exampleSentence`. */
+  exampleAnswer: z.string().trim().max(120).optional(),
   exampleSource: z.string().trim().max(80),
   exampleSourceUrl: z
     .string()

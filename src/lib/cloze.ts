@@ -42,24 +42,45 @@ function replaceMatch(sentence: string, match: RegExpMatchArray): ClozeMatch {
 }
 
 /**
- * Finds the word inside its saved example sentence. Tatoeba often returns an
- * inflected form, so after an exact match we also try the word without its
- * article and finally a conservative prefix match.
+ * Finds an exact surface form in a sentence. This is used for forms resolved
+ * by the AI or stored on the word, where the spelling is already known and
+ * must not be guessed from endings.
  */
-export function clozeForWord(word: Word, language: string): ClozeMatch | null {
-  const sentence = word.exampleSentence.trim();
-  if (!sentence) return null;
+export function findExactForm(sentence: string, form: string): ClozeMatch | null {
+  const clean = form.trim();
+  if (!clean) return null;
 
-  const fullTerm = word.originalWord.trim();
-  if (!fullTerm) return null;
+  const match = sentence.match(
+    new RegExp(
+      `(?<![\\p{L}\\p{M}])${escapeRegExp(clean)}(?![\\p{L}\\p{M}])`,
+      "iu",
+    ),
+  );
+  if (match?.index === undefined) return null;
 
-  const fullMatch = sentence.match(termPattern(fullTerm, language));
-  if (fullMatch?.index !== undefined) return replaceMatch(sentence, fullMatch);
+  return replaceMatch(sentence, match);
+}
+
+/**
+ * Tries to locate the dictionary term (or a regular inflection) in a sentence.
+ * This is the deterministic fallback used for Tatoeba examples.
+ */
+export function findSurfaceForm(
+  sentence: string,
+  term: string,
+  language: string,
+): ClozeMatch | null {
+  const cleaned = sentence.trim();
+  const fullTerm = term.trim();
+  if (!cleaned || !fullTerm) return null;
+
+  const fullMatch = cleaned.match(termPattern(fullTerm, language));
+  if (fullMatch?.index !== undefined) return replaceMatch(cleaned, fullMatch);
 
   const bareTerm = stripArticle(fullTerm, language);
   if (bareTerm && bareTerm !== fullTerm) {
-    const bareMatch = sentence.match(termPattern(bareTerm, language));
-    if (bareMatch?.index !== undefined) return replaceMatch(sentence, bareMatch);
+    const bareMatch = cleaned.match(termPattern(bareTerm, language));
+    if (bareMatch?.index !== undefined) return replaceMatch(cleaned, bareMatch);
   }
 
   // Verbs and other inflected words may not share a regular ending with the
@@ -73,11 +94,29 @@ export function clozeForWord(word: Word, language: string): ClozeMatch | null {
       `(?<![\\p{L}\\p{M}])${escapeRegExp(prefix)}[\\p{L}\\p{M}'’]*(?![\\p{L}\\p{M}])`,
       "iu",
     );
-    const stemMatch = sentence.match(stemPattern);
-    if (stemMatch?.index !== undefined) return replaceMatch(sentence, stemMatch);
+    const stemMatch = cleaned.match(stemPattern);
+    if (stemMatch?.index !== undefined) return replaceMatch(cleaned, stemMatch);
   }
 
   return null;
+}
+
+/**
+ * Finds the word inside its saved example sentence. A form resolved when the
+ * example was created (for example by the AI) wins, because irregular verbs
+ * like "go → went" cannot be found from the dictionary form alone.
+ */
+export function clozeForWord(word: Word, language: string): ClozeMatch | null {
+  const sentence = word.exampleSentence.trim();
+  if (!sentence) return null;
+
+  const storedForm = word.exampleAnswer?.trim();
+  if (storedForm) {
+    const storedMatch = findExactForm(sentence, storedForm);
+    if (storedMatch) return storedMatch;
+  }
+
+  return findSurfaceForm(sentence, word.originalWord, language);
 }
 
 export function clozeSentence(word: Word, language: string): string | null {

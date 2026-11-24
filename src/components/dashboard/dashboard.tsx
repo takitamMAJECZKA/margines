@@ -317,71 +317,159 @@ export function Dashboard() {
       ) : (
         <main className="mx-auto w-full max-w-3xl px-4 sm:px-6">
           <section className="pt-8 sm:pt-12">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
-                  <span
-                    aria-hidden="true"
-                    className="size-1.5 rounded-full"
-                    style={{
-                      backgroundColor: DICTIONARY_COLOR_HEX[selected.color],
-                    }}
-                  />
-                  <span>
-                    {languagePairLabel(
-                      selected.sourceLanguage,
-                      selected.targetLanguage,
-                      selected.isNative,
-                    )}
-                  </span>
-                  <span aria-hidden="true">·</span>
-                  <span>{wordCountLabel(totalWordCount)}</span>
-                </p>
-                <h1 className="mt-2.5 font-display text-[2.55rem] leading-[1.02] font-medium tracking-[-0.035em] break-words sm:text-5xl">
-                  {selected.name}
-                </h1>
-              </div>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
+            {activeSet ? (
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Zarządzaj słownikiem"
-                    title="Zarządzaj słownikiem"
-                    className="mt-1 shrink-0 text-muted-foreground"
+                    onClick={() => selectSet(null)}
+                    className="-ml-1 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
                   >
-                    <MoreHorizontal />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => setRenameOpen(true)}>
-                    <Pencil />
-                    Zmień nazwę
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      setEditingSet(null);
-                      setSetFormOpen(true);
-                    }}
-                  >
-                    <FolderOpen />
-                    Nowy zestaw
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={() => setDeleteDictionaryOpen(true)}
-                  >
-                    <Trash2 />
-                    Usuń słownik
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                    <ArrowLeft className="size-3.5" aria-hidden="true" />
+                    Wszystkie zestawy
+                  </button>
+                  <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
+                    <span
+                      aria-hidden="true"
+                      className="size-1.5 rounded-full"
+                      style={{
+                        backgroundColor: DICTIONARY_COLOR_HEX[selected.color],
+                      }}
+                    />
+                    <span className="truncate">{selected.name}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{wordCountLabel(scopedWordCount)}</span>
+                  </p>
+                  <div className="mt-2.5 flex items-center gap-2.5">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      {recentActive ? (
+                        <Clock3 className="size-5" aria-hidden="true" />
+                      ) : (
+                        <FolderOpen className="size-5" aria-hidden="true" />
+                      )}
+                    </span>
+                    <h1 className="min-w-0 font-display text-[2.1rem] leading-[1.04] font-medium tracking-[-0.035em] break-words sm:text-[2.65rem]">
+                      {activeSet.name}
+                    </h1>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {recentActive
+                      ? "Automatyczna grupa 30 najnowszych słów."
+                      : "Nowe słowa trafią od razu do tego zestawu."}
+                  </p>
+                </div>
 
-            <div className="mt-7 grid gap-2.5 sm:grid-cols-[1fr_auto]">
+                {recentActive ? null : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Edytuj zestaw ${activeSet.name}`}
+                        title="Edytuj zestaw"
+                        className="mt-1 shrink-0 text-muted-foreground"
+                      >
+                        <Pencil />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => setAssigningSet(activeSet)}>
+                        <ListPlus />
+                        Przypisz słowa
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setEditingSet(activeSet);
+                          setSetFormOpen(true);
+                        }}
+                      >
+                        <Pencil />
+                        Zmień nazwę zestawu
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={() => setDeletingSet(activeSet)}
+                      >
+                        <Trash2 />
+                        Usuń zestaw
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
+                    <span
+                      aria-hidden="true"
+                      className="size-1.5 rounded-full"
+                      style={{
+                        backgroundColor: DICTIONARY_COLOR_HEX[selected.color],
+                      }}
+                    />
+                    <span>
+                      {languagePairLabel(
+                        selected.sourceLanguage,
+                        selected.targetLanguage,
+                        selected.isNative,
+                      )}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>{wordCountLabel(totalWordCount)}</span>
+                  </p>
+                  <h1 className="mt-2.5 font-display text-[2.55rem] leading-[1.02] font-medium tracking-[-0.035em] break-words sm:text-5xl">
+                    {selected.name}
+                  </h1>
+                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Zarządzaj słownikiem"
+                      title="Zarządzaj słownikiem"
+                      className="mt-1 shrink-0 text-muted-foreground"
+                    >
+                      <MoreHorizontal />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => setRenameOpen(true)}>
+                      <Pencil />
+                      Zmień nazwę
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setEditingSet(null);
+                        setSetFormOpen(true);
+                      }}
+                    >
+                      <FolderOpen />
+                      Nowy zestaw
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => setDeleteDictionaryOpen(true)}
+                    >
+                      <Trash2 />
+                      Usuń słownik
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+
+            <div
+              className={`grid gap-2.5 sm:grid-cols-[1fr_auto] ${
+                activeSet ? "mt-5" : "mt-7"
+              }`}
+            >
               <SearchInput value={search} onChange={updateSearch} />
               <Button
                 type="button"
@@ -398,84 +486,7 @@ export function Dashboard() {
               </Button>
             </div>
 
-            {activeSet ? (
-              <section
-                aria-labelledby="active-set-heading"
-                className="mt-6 rounded-2xl border border-primary/20 bg-primary/[0.045] p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => selectSet(null)}
-                      className="-ml-1 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
-                    >
-                      <ArrowLeft className="size-3.5" aria-hidden="true" />
-                      Wszystkie zestawy
-                    </button>
-                    <div className="mt-2 flex items-center gap-2.5">
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                        {recentActive ? (
-                          <Clock3 className="size-[18px]" aria-hidden="true" />
-                        ) : (
-                          <FolderOpen className="size-[18px]" aria-hidden="true" />
-                        )}
-                      </span>
-                      <h2
-                        id="active-set-heading"
-                        className="min-w-0 truncate font-display text-2xl font-medium tracking-[-0.02em]"
-                      >
-                        {activeSet.name}
-                      </h2>
-                    </div>
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      {recentActive
-                        ? `${wordCountLabel(scopedWordCount)} · automatyczna grupa 30 najnowszych słów`
-                        : `${wordCountLabel(scopedWordCount)} · nowe słowa trafią od razu do tego zestawu`}
-                    </p>
-                  </div>
-
-                  {recentActive ? null : (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Zarządzaj zestawem ${activeSet.name}`}
-                          className="shrink-0 text-muted-foreground"
-                        >
-                          <MoreHorizontal />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setAssigningSet(activeSet)}>
-                          <ListPlus />
-                          Przypisz słowa
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={() => {
-                            setEditingSet(activeSet);
-                            setSetFormOpen(true);
-                          }}
-                        >
-                          <Pencil />
-                          Zmień nazwę zestawu
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onSelect={() => setDeletingSet(activeSet)}
-                        >
-                          <Trash2 />
-                          Usuń zestaw
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              </section>
-            ) : (
+            {activeSet ? null : (
               <section className="mt-7" aria-labelledby="sets-heading">
                 <div className="mb-3">
                   <h2

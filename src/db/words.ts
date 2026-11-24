@@ -27,6 +27,7 @@ function sanitizeExample(draft: WordDraftValues): WordDraftValues {
       ...draft,
       exampleSentence: "",
       exampleTranslation: "",
+      exampleAnswer: "",
       exampleSource: "",
       exampleSourceUrl: "",
       exampleAttribution: "",
@@ -37,13 +38,14 @@ function sanitizeExample(draft: WordDraftValues): WordDraftValues {
   if (draft.exampleType === "manual") {
     return {
       ...draft,
+      exampleAnswer: "",
       exampleSource: "",
       exampleSourceUrl: "",
       exampleAttribution: "",
     };
   }
 
-  return draft;
+  return { ...draft, exampleAnswer: draft.exampleAnswer ?? "" };
 }
 
 async function assertUniqueWord(
@@ -174,6 +176,7 @@ export async function attachExampleIfEmpty(
     await db.words.update(id, {
       exampleSentence: example.text,
       exampleTranslation: example.translation,
+      exampleAnswer: example.answer?.trim() ?? "",
       exampleSource: example.source,
       exampleSourceUrl: example.sourceUrl,
       exampleAttribution: example.attribution,

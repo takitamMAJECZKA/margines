@@ -36,6 +36,8 @@ export interface AuthenticExample {
   attribution: string;
   license: string;
   hasDirectTranslation: boolean;
+  /** Exact form of the target word used in `text`, when it is known. */
+  answer?: string;
 }
 
 /** A monolingual dictionary sense, used by the native Polish dictionary. */
@@ -92,6 +94,8 @@ export interface ArticleResponse {
 export interface AiExample {
   text: string;
   translation: string;
+  /** Exact surface form used in `text`; empty when the model omitted it. */
+  answer?: string;
   model: string;
 }
 

@@ -644,49 +644,11 @@ function StudyScreenContent({
             <span className="truncate font-medium text-foreground">
               {scopedSet?.name ?? selected.name}
             </span>
-            <div className="flex shrink-0 items-center gap-1">
-              <span className="tabular-nums text-muted-foreground">
-                {session.mode === "daily"
-                  ? `${completedCount} / ${total} powtórzone`
-                  : `${knownCount} / ${total} opanowane`}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={toggleExamples}
-                role="switch"
-                aria-checked={showExamples}
-                aria-label="Przykładowe zdania na fiszkach"
-                title={
-                  showExamples
-                    ? "Ukryj przykładowe zdania"
-                    : "Pokaż przykładowe zdania"
-                }
-                className={cn(
-                  "size-8 rounded-full",
-                  showExamples
-                    ? "text-primary hover:text-primary"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {showExamples ? <Eye /> : <EyeOff />}
-              </Button>
-              {session.history.length > 0 ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={undoLastAnswer}
-                  aria-label="Cofnij ostatnią fiszkę"
-                  aria-keyshortcuts="Control+Z"
-                  title="Cofnij ostatnią fiszkę (Ctrl+Z)"
-                  className="size-8 rounded-full text-muted-foreground hover:text-foreground"
-                >
-                  <Undo2 />
-                </Button>
-              ) : null}
-            </div>
+            <span className="shrink-0 tabular-nums text-muted-foreground">
+              {session.mode === "daily"
+                ? `${completedCount} / ${total} powtórzone`
+                : `${knownCount} / ${total} opanowane`}
+            </span>
           </div>
 
           <div
@@ -912,6 +874,19 @@ function StudyScreenContent({
               </div>
               </SwipeableCard>
             </div>
+          ) : null}
+
+          {session.history.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={undoLastAnswer}
+              aria-keyshortcuts="Control+Z"
+              className="mt-4 h-12 w-full"
+            >
+              <Undo2 />
+              Cofnij ostatnią fiszkę
+            </Button>
           ) : null}
 
           <p className="mt-5 text-center text-[11px] leading-relaxed text-muted-foreground">

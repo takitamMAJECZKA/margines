@@ -165,6 +165,7 @@ export function WordPreviewForm({
       translation,
       exampleSentence: selectedExample?.text ?? "",
       exampleTranslation: selectedExample?.translation ?? "",
+      exampleAnswer: selectedExample?.answer ?? "",
       exampleType: selectedExample
         ? selectedSource === "AI"
           ? ("ai" as const)
